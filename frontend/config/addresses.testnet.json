@@ -1,0 +1,10 @@
+{
+  "network": "testnet",
+  "deployer": "ST2P3Z4K0MQ0VAB0B4A4JHAQAK0P7Y4R7K1PGGR7Z",
+  "contracts": {
+    "escrow": "ST2P3Z4K0MQ0VAB0B4A4JHAQAK0P7Y4R7K1PGGR7Z.escrow",
+    "remittance": "ST2P3Z4K0MQ0VAB0B4A4JHAQAK0P7Y4R7K1PGGR7Z.remittance"
+  },
+  "rpcUrl": "https://api.testnet.hiro.so",
+  "explorerUrl": "https://explorer.hiro.so"
+}

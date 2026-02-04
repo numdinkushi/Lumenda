@@ -1,0 +1,61 @@
+{
+  "functions": [
+    {
+      "name": "lock-funds",
+      "access": "public",
+      "args": [
+        { "name": "transfer-id", "type": "uint128" },
+        { "name": "sender", "type": "principal" },
+        { "name": "recipient", "type": "principal" },
+        { "name": "amount", "type": "uint128" }
+      ],
+      "outputs": { "type": { "response": { "ok": "bool", "error": "uint128" } } }
+    },
+    {
+      "name": "release-funds",
+      "access": "public",
+      "args": [{ "name": "transfer-id", "type": "uint128" }],
+      "outputs": { "type": { "response": { "ok": "bool", "error": "uint128" } } }
+    },
+    {
+      "name": "refund-funds",
+      "access": "public",
+      "args": [{ "name": "transfer-id", "type": "uint128" }],
+      "outputs": { "type": { "response": { "ok": "bool", "error": "uint128" } } }
+    },
+    {
+      "name": "get-escrow-info",
+      "access": "read_only",
+      "args": [{ "name": "transfer-id", "type": "uint128" }],
+      "outputs": {
+        "type": {
+          "optional": {
+            "tuple": [
+              { "name": "sender", "type": "principal" },
+              { "name": "recipient", "type": "principal" },
+              { "name": "amount", "type": "uint128" },
+              { "name": "locked-at", "type": "uint128" },
+              { "name": "status", "type": { "string-ascii": { "length": 20 } } }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "get-escrow-balance",
+      "access": "read_only",
+      "args": [{ "name": "account", "type": "principal" }],
+      "outputs": { "type": "uint128" }
+    },
+    {
+      "name": "is-escrow-locked",
+      "access": "read_only",
+      "args": [{ "name": "transfer-id", "type": "uint128" }],
+      "outputs": { "type": "bool" }
+    }
+  ],
+  "variables": [],
+  "maps": [],
+  "fungible_tokens": [],
+  "non_fungible_tokens": []
+}

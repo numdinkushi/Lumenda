@@ -1,0 +1,25 @@
+---
+id: 0
+name: Testnet deployment
+network: testnet
+stacks-node: "${STACKS_TESTNET_RPC_URL}"
+plan:
+  batches:
+    - id: 0
+      transactions:
+        - contract-publish:
+            contract-name: escrow
+            expected-sender: ${DEPLOYER_ADDRESS}
+            cost: 100000
+            path: core/escrow.clar
+            anchor-block-only: false
+            clarity-version: 2
+        - contract-publish:
+            contract-name: remittance
+            expected-sender: ${DEPLOYER_ADDRESS}
+            cost: 100000
+            path: core/remittance.clar
+            anchor-block-only: false
+            clarity-version: 2
+            depends-on:
+              - escrow

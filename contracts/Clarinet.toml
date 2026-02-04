@@ -1,0 +1,8 @@
+[project]
+name = "lumenda-contracts"
+authors = ["Lumenda Team"]
+description = "Lumenda Remittance Platform Smart Contracts"
+
+[contracts]
+escrow = "core/escrow.clar"
+remittance = "core/remittance.clar"

@@ -1,0 +1,38 @@
+[network]
+name = "devnet"
+use_public_node = false
+
+[node]
+rpc_bind = "127.0.0.1:20443"
+p2p_bind = "127.0.0.1:20444"
+mempool_bind = "127.0.0.1:20445"
+bootstrap_node = ""
+
+[node.bitcoin_peer]
+host = "127.0.0.1"
+rpc_port = 18443
+rpc_username = "devnet"
+rpc_password = "devnet"
+p2p_port = 18444
+
+[node.miner]
+enabled = true
+name = "devnet-miner"
+stacks_address = "STB44HYPYAT9BBEQA3S6MXUUCZFCKK0G1Q5JNHDB"
+bitcoin_address = "mqVnk6N3d3vNaSh8X5Y2V3rJpZvK5tJ2Kz"
+
+[node.events_observer]
+enabled = false
+endpoint = ""
+
+[node.telemetry]
+enabled = false
+endpoint = ""
+
+[accounts]
+# Default deployer account used by clarinet deployments generate/apply
+# Uses standard BIP39 test mnemonic (devnet only - do not use with real funds)
+[accounts.deployer]
+mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+balance = 100_000_000_000_000
+derivation = "m/44'/5757'/0'/0/0"

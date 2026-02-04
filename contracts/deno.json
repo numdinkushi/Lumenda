@@ -1,0 +1,21 @@
+{
+  "imports": {
+    "clarinet": "https://deno.land/x/clarinet@v1.7.1/index.ts",
+    "std/testing/asserts": "https://deno.land/std@0.224.0/testing/asserts.ts"
+  },
+  "compilerOptions": {
+    "lib": ["deno.window"],
+    "strict": true,
+    "allowJs": true
+  },
+  "fmt": {
+    "files": {
+      "include": ["tests/**/*.ts"]
+    }
+  },
+  "lint": {
+    "files": {
+      "include": ["tests/**/*.ts"]
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "network": "mainnet",
+  "deployer": "",
+  "contracts": {
+    "escrow": "",
+    "remittance": ""
+  },
+  "rpcUrl": "https://api.hiro.so",
+  "explorerUrl": "https://explorer.hiro.so"
+}

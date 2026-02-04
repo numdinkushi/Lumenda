@@ -1,0 +1,98 @@
+{
+  "functions": [
+    {
+      "name": "initiate-transfer",
+      "access": "public",
+      "args": [
+        { "name": "recipient", "type": "principal" },
+        { "name": "amount", "type": "uint128" }
+      ],
+      "outputs": { "type": { "response": { "ok": "uint128", "error": "uint128" } } }
+    },
+    {
+      "name": "complete-transfer",
+      "access": "public",
+      "args": [{ "name": "transfer-id", "type": "uint128" }],
+      "outputs": { "type": { "response": { "ok": "bool", "error": "uint128" } } }
+    },
+    {
+      "name": "cancel-transfer",
+      "access": "public",
+      "args": [{ "name": "transfer-id", "type": "uint128" }],
+      "outputs": { "type": { "response": { "ok": "bool", "error": "uint128" } } }
+    },
+    {
+      "name": "pause-contract",
+      "access": "public",
+      "args": [],
+      "outputs": { "type": { "response": { "ok": "bool", "error": "uint128" } } }
+    },
+    {
+      "name": "unpause-contract",
+      "access": "public",
+      "args": [],
+      "outputs": { "type": { "response": { "ok": "bool", "error": "uint128" } } }
+    },
+    {
+      "name": "set-fee-rate",
+      "access": "public",
+      "args": [{ "name": "new-rate", "type": "uint128" }],
+      "outputs": { "type": { "response": { "ok": "bool", "error": "uint128" } } }
+    },
+    {
+      "name": "get-transfer",
+      "access": "read_only",
+      "args": [{ "name": "transfer-id", "type": "uint128" }],
+      "outputs": {
+        "type": {
+          "optional": {
+            "tuple": [
+              { "name": "sender", "type": "principal" },
+              { "name": "recipient", "type": "principal" },
+              { "name": "amount", "type": "uint128" },
+              { "name": "fee", "type": "uint128" },
+              { "name": "created-at", "type": "uint128" },
+              { "name": "completed-at", "type": { "optional": "uint128" } },
+              { "name": "cancelled-at", "type": { "optional": "uint128" } },
+              { "name": "status", "type": { "string-ascii": { "length": 20 } } }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "get-transfer-status",
+      "access": "read_only",
+      "args": [{ "name": "transfer-id", "type": "uint128" }],
+      "outputs": { "type": { "optional": { "string-ascii": { "length": 20 } } } }
+    },
+    {
+      "name": "get-owner",
+      "access": "read_only",
+      "args": [],
+      "outputs": { "type": "principal" }
+    },
+    {
+      "name": "get-fee-rate",
+      "access": "read_only",
+      "args": [],
+      "outputs": { "type": "uint128" }
+    },
+    {
+      "name": "get-paused-status",
+      "access": "read_only",
+      "args": [],
+      "outputs": { "type": "bool" }
+    },
+    {
+      "name": "get-transfer-count",
+      "access": "read_only",
+      "args": [],
+      "outputs": { "type": "uint128" }
+    }
+  ],
+  "variables": [],
+  "maps": [],
+  "fungible_tokens": [],
+  "non_fungible_tokens": []
+}

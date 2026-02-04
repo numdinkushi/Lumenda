@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-contracts:
+    name: Test Smart Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Clarinet
+        run: |
+          curl -L https://github.com/hirosystems/clarinet/releases/latest/download/clarinet-installer.sh | bash
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      
+      - name: Check Contracts
+        run: |
+          cd contracts
+          clarinet check
+      
+      - name: Run Contract Tests
+        run: |
+          cd contracts
+          clarinet test
+
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check frontend exists
+        id: frontend
+        run: echo "exists=$([ -f frontend/package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        if: steps.frontend.outputs.exists == 'true'
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        if: steps.frontend.outputs.exists == 'true'
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Lint
+        if: steps.frontend.outputs.exists == 'true'
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: Build
+        if: steps.frontend.outputs.exists == 'true'
+        run: |
+          cd frontend
+          npm run build

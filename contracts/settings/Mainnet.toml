@@ -1,0 +1,9 @@
+[network]
+name = "mainnet"
+stacks_node_rpc_url = "https://api.hiro.so"
+stacks_node_ws_url = "wss://api.hiro.so"
+stacks_node_p2p_url = "https://api.hiro.so"
+bitcoin_node_rpc_url = "https://mempool.space/api"
+bitcoin_node_rpc_username = ""
+bitcoin_node_rpc_password = ""
+stacks_explorer_url = "https://explorer.stacks.co/?chain=mainnet"

@@ -1,0 +1,10 @@
+[network]
+name = "testnet"
+stacks_node_rpc_url = "https://api.testnet.hiro.so"
+stacks_node_ws_url = "wss://api.testnet.hiro.so"
+stacks_node_p2p_url = "https://api.testnet.hiro.so"
+bitcoin_node_rpc_url = "https://mempool.space/testnet/api"
+bitcoin_node_rpc_username = ""
+bitcoin_node_rpc_password = ""
+stacks_faucet_url = "https://explorer.stacks.co/sandbox/faucet?chain=testnet"
+stacks_explorer_url = "https://explorer.stacks.co/?chain=testnet"

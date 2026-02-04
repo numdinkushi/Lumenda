@@ -1,0 +1,15 @@
+{
+  "name": "lumenda",
+  "private": true,
+  "scripts": {
+    "deploy:testnet": "node scripts/deploy-testnet.mjs"
+  },
+  "dependencies": {
+    "@stacks/network": "^6.0.0",
+    "@stacks/transactions": "^6.0.0",
+    "bip32": "^4.0.0",
+    "bip39": "^3.1.0",
+    "dotenv": "^16.0.0",
+    "tiny-secp256k1": "^2.2.4"
+  }
+}
