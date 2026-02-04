@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { Header } from "@/components/layout";
+import { RequireWallet } from "@/components/auth/require-wallet";
 import {
   Card,
   CardContent,
@@ -14,8 +17,9 @@ import { ArrowLeft } from "lucide-react";
 
 export default function SendPage() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
+    <RequireWallet>
+      <div className="min-h-screen flex flex-col">
+        <Header />
 
       <main className="flex-1 container px-4 py-10 md:px-6 md:py-14">
         <Button variant="ghost" size="sm" className="mb-6 gap-2 -ml-2" asChild>
@@ -54,13 +58,14 @@ export default function SendPage() {
                   className="bg-background/50 font-mono text-sm"
                 />
               </div>
-              <Button className="w-full" disabled>
-                Send (connect wallet first)
+              <Button className="w-full">
+                Send
               </Button>
             </CardContent>
           </Card>
         </div>
       </main>
     </div>
+    </RequireWallet>
   );
 }

@@ -118,6 +118,35 @@
   --sidebar-ring: var(--lumenda-ring);
 }
 
+/* Sun/spotlight gradient – warm glow from top-left (mature, subtle) */
+@layer utilities {
+  .bg-sun-gradient {
+    background: radial-gradient(
+      ellipse 120% 100% at 0% 0%,
+      rgba(251, 191, 36, 0.14) 0%,
+      rgba(245, 158, 11, 0.07) 35%,
+      rgba(251, 191, 36, 0.02) 55%,
+      transparent 72%
+    );
+  }
+}
+
+/* Neon text effect (Lumenda branding) */
+@layer utilities {
+  .text-neon {
+    color: var(--lumenda-primary);
+    text-shadow:
+      0 0 10px var(--lumenda-primary),
+      0 0 20px var(--lumenda-primary),
+      0 0 40px var(--lumenda-primary),
+      0 0 80px rgba(0, 224, 255, 0.5);
+  }
+  .text-neon-subtle {
+    color: var(--lumenda-foreground);
+    text-shadow: 0 0 12px var(--lumenda-primary);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

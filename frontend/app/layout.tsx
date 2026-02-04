@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { WalletProvider } from "@/contexts/wallet-context";
+import { PageBackground } from "@/components/layout/page-background";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,7 +29,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <WalletProvider>
+          <div className="relative min-h-screen">
+            <PageBackground />
+            <div className="relative z-10">{children}</div>
+          </div>
+        </WalletProvider>
       </body>
     </html>
   );
