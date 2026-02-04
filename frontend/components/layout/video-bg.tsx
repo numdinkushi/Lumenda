@@ -3,15 +3,14 @@
 const VIDEO_SRC = "/assets/video/lumenda_bg.mp4";
 
 /**
- * Full-page animated video background. Use in layout to wrap all pages.
- * Video is blended into the page background (mix-blend-mode + gradient overlay).
+ * Full-page animated video background (landing only).
+ * Uses same opacity + overlay as PageBackground so it blends like the image bg.
  */
 export function VideoBg() {
   return (
     <>
-      {/* Video blends into page background (soft-light + base color behind video) */}
       <div
-        className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden bg-background"
+        className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
         aria-hidden
       >
         <video
@@ -20,12 +19,12 @@ export function VideoBg() {
           loop
           muted
           playsInline
-          className="h-full w-full object-contain object-center select-none opacity-80 mix-blend-soft-light"
+          className="h-full w-full object-contain object-center select-none opacity-[0.18]"
         />
       </div>
-      {/* Gradient blend: background color from edges + center tint so video melts in */}
+      {/* Same overlay as image bg – keeps video integrated, not a separate layer */}
       <div
-        className="pointer-events-none absolute inset-0 bg-video-blend-overlay"
+        className="pointer-events-none absolute inset-0 bg-background/55"
         aria-hidden
       />
       {/* Sun/spotlight: warm gradient from top-left */}
