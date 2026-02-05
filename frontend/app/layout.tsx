@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { WalletProvider } from "@/contexts/wallet-context";
 import { BackgroundByRoute } from "@/components/layout/background-by-route";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,6 +35,7 @@ export default function RootLayout({
             <BackgroundByRoute />
             <div className="relative z-10">{children}</div>
           </div>
+          <Toaster />
         </WalletProvider>
       </body>
     </html>

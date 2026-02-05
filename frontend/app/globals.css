@@ -139,6 +139,25 @@
       ),
       color-mix(in srgb, var(--lumenda-background) 48%, transparent);
   }
+
+  /**
+   * Covers video watermark in top-right with a soft blend into background.
+   * Uses --lumenda-background; size overridable via --video-watermark-cover-width/height.
+   */
+  .video-watermark-cover {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: var(--video-watermark-cover-width, 12rem);
+    height: var(--video-watermark-cover-height, 4.5rem);
+    background: radial-gradient(
+      ellipse 100% 100% at 100% 0%,
+      var(--lumenda-background) 0%,
+      var(--lumenda-background) 35%,
+      transparent 72%
+    );
+    pointer-events: none;
+  }
 }
 
 /* Neon text effect (Lumenda branding) */

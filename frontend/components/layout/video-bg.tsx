@@ -21,6 +21,8 @@ export function VideoBg() {
           playsInline
           className="h-full w-full object-contain object-center select-none opacity-[0.18]"
         />
+        {/* Blends over video watermark in top-right (utility: .video-watermark-cover) */}
+        <div className="video-watermark-cover" aria-hidden />
       </div>
       {/* Same overlay as image bg – keeps video integrated, not a separate layer */}
       <div

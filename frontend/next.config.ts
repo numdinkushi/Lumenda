@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Note: @stacks/connect must be installed for the build to succeed
+  // Run: npm install @stacks/connect
 };
 
 export default nextConfig;
