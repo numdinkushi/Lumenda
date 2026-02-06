@@ -47,7 +47,7 @@
     (begin
         ;; Validate inputs
         (asserts! (> amount u0) ERR-AMOUNT-ZERO)
-        (asserts! (is-eq sender recipient) (err u106)) ;; ERR-TRANSFER-SENDER-RECIPIENT-SAME
+        (asserts! (not (is-eq sender recipient)) (err u106)) ;; ERR-TRANSFER-SENDER-RECIPIENT-SAME
         
         ;; Check if escrow already exists
         (asserts! (is-none (map-get? escrow-info {transfer-id: transfer-id})) ERR-ESCROW-ALREADY-LOCKED)

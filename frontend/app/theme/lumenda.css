@@ -1,0 +1,25 @@
+/**
+ * Lumenda brand palette (from logo).
+ * Values match lib/theme/lumenda-colors.ts – keep in sync when changing.
+ */
+
+:root {
+  --lumenda-background: #1e1136;
+  --lumenda-foreground: #e0f7ff;
+  --lumenda-primary: #00e0ff;
+  --lumenda-primary-foreground: #1e1136;
+  --lumenda-secondary: #a855f7;
+  --lumenda-tertiary: #ff6040;
+  --lumenda-accent: #c084fc;
+  --lumenda-muted: #500050;
+  --lumenda-card: #2a1a4a;
+  --lumenda-border: rgba(168, 85, 247, 0.25);
+  --lumenda-input: rgba(224, 231, 255, 0.12);
+  --lumenda-ring: #00e0ff;
+  --lumenda-destructive: #ef4444;
+  --lumenda-chart-1: #00e0ff;
+  --lumenda-chart-2: #a855f7;
+  --lumenda-chart-3: #ff6040;
+  --lumenda-chart-4: #c084fc;
+  --lumenda-chart-5: #e000ff;
+}

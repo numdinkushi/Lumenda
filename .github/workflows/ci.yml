@@ -15,18 +15,34 @@ jobs:
       
       - name: Install Clarinet
         run: |
-          curl -L https://github.com/hirosystems/clarinet/releases/latest/download/clarinet-installer.sh | bash
+          CLARINET_VERSION="v3.13.1"
+          curl -sL "https://github.com/stx-labs/clarinet/releases/download/${CLARINET_VERSION}/clarinet-linux-x64-glibc.tar.gz" -o clarinet.tar.gz
+          tar xzf clarinet.tar.gz
+          mkdir -p "$HOME/.cargo/bin"
+          BINARY=$(find . -maxdepth 2 -type f -name clarinet 2>/dev/null | head -1)
+          mv "$BINARY" "$HOME/.cargo/bin/clarinet"
+          chmod +x "$HOME/.cargo/bin/clarinet"
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       
       - name: Check Contracts
         run: |
           cd contracts
           clarinet check
-      
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Run Contract Tests
         run: |
           cd contracts
-          clarinet test
+          npx vitest run
 
   test-frontend:
     name: Test Frontend
@@ -42,7 +58,7 @@ jobs:
         if: steps.frontend.outputs.exists == 'true'
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 

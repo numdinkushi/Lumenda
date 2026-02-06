@@ -1,0 +1,13 @@
+{
+  "name": "lumenda-contracts",
+  "private": true,
+  "scripts": {
+    "test": "deno test --allow-read --allow-net tests/ || (echo 'Install Deno to run tests: https://deno.land' && exit 1)"
+  },
+  "description": "Lumenda remittance contracts - run tests with Deno (see README)",
+  "devDependencies": {
+    "@stacks/clarinet-sdk": "^3.13.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

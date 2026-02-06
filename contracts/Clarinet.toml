@@ -3,6 +3,20 @@ name = "lumenda-contracts"
 authors = ["Lumenda Team"]
 description = "Lumenda Remittance Platform Smart Contracts"
 
-[contracts]
-escrow = "core/escrow.clar"
-remittance = "core/remittance.clar"
+[contracts.escrow]
+path = "core/escrow.clar"
+
+[contracts.remittance]
+path = "core/remittance.clar"
+
+[accounts.deployer]
+mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+balance = 100_000_000_000_000
+
+[accounts.wallet_1]
+mnemonic = "achieve quote excuse letter decide skate bird bulk canal weekend fragile firm"
+balance = 100_000_000_000_000
+
+[accounts.wallet_2]
+mnemonic = "legal winner thank year wave sausage worth useful legal winner thank yellow"
+balance = 100_000_000_000_000
