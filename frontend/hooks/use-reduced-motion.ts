@@ -7,8 +7,8 @@ import { useMemo } from "react";
  * Use to shorten or skip the logo trace on load.
  */
 export function useReducedMotion(): boolean {
-  if (typeof window === "undefined") return false;
   return useMemo(() => {
+    if (typeof window === "undefined") return false;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     return mq.matches;
   }, []);

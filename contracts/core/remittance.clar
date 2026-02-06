@@ -108,7 +108,7 @@
             
             ;; Validate inputs
             (asserts! (> amount u0) ERR-AMOUNT-ZERO)
-            (asserts! (is-eq sender recipient) ERR-TRANSFER-SENDER-RECIPIENT-SAME)
+            (asserts! (not (is-eq sender recipient)) ERR-TRANSFER-SENDER-RECIPIENT-SAME)
             
             ;; Calculate fee
             (let ((fee (calculate-fee amount))

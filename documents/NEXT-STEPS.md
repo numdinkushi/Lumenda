@@ -77,3 +77,25 @@ clarinet test
 ```
 
 Once verified, you're ready to submit Month 1 PR! 🚀
+
+---
+
+## 🔗 Lumenda ↔ Numdell Strategy
+
+Lumenda stays on **Stacks** (Code for STX). The same design will be ported to **Hedera** as **Numdell** for the Hedera Apex Hackathon 2026. See:
+
+- **Strategy (Lumenda + Numdell)**: `../Numdell/documents/LUMENDA_NUMDELL_STRATEGY.md`
+- **Numdell brief**: `../Numdell/documents/NUMDELL_PROJECT_BRIEF.md`
+- **Port plan**: `../Numdell/documents/PORT_PLAN_FROM_LUMENDA.md`
+
+## 📐 Phase B (Later): DeFi-Style Improvements on Stacks
+
+After Month 2 (limits, fees), add these so Lumenda is interoperable, composable, and “programmable payment rails”—and so the same can be ported to Numdell:
+
+- **Programmable rails**: Time locks, conditional release, optional recurring; composable contract interfaces.
+- **Tokenization**: Use SIP-010 for at least one token type (e.g. stablecoin or receipt/voucher); one RWA-style use case in docs.
+- **Composability**: One concrete use case where another app/protocol uses Lumenda (e.g. batch disbursement, merchant plugin).
+- **Interoperability / bridge**: One Stacks bridge angle or “Stacks leg” of a cross-chain remittance flow (implement or spec).
+- **Narrative**: Synthetics and “leveraging Stacks/Bitcoin” in README and architecture.
+
+Each of these can be delivered as separate PRs for Code for STX.

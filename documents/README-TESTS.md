@@ -16,14 +16,34 @@ The `deno.json` file includes import maps that help resolve modules.
 
 ## Running Tests
 
-Tests are run via Clarinet, which uses Deno under the hood:
+Many newer Clarinet versions no longer include the `clarinet test` subcommand. Use one of these:
+
+### Option 1: Deno (recommended for this repo)
+
+If you have [Deno](https://deno.land/) installed:
+
+```bash
+cd contracts
+npm test
+```
+
+or directly:
+
+```bash
+cd contracts
+deno test --allow-read --allow-net tests/
+```
+
+### Option 2: Clarinet with built-in test (older Clarinet)
+
+If your Clarinet still has `clarinet test`:
 
 ```bash
 cd contracts
 clarinet test
 ```
 
-**Note**: The IDE errors are cosmetic - tests will run correctly with `clarinet test` because Clarinet uses Deno, which natively supports HTTP imports.
+**Note**: The IDE errors are cosmetic - tests run correctly with Deno because the test files use Deno-style HTTP imports.
 
 ## If Errors Persist
 

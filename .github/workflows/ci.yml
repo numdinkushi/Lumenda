@@ -15,7 +15,13 @@ jobs:
       
       - name: Install Clarinet
         run: |
-          curl -L https://github.com/hirosystems/clarinet/releases/latest/download/clarinet-installer.sh | bash
+          CLARINET_VERSION="v3.13.1"
+          curl -sL "https://github.com/stx-labs/clarinet/releases/download/${CLARINET_VERSION}/clarinet-linux-x64-glibc.tar.gz" -o clarinet.tar.gz
+          tar xzf clarinet.tar.gz
+          mkdir -p "$HOME/.cargo/bin"
+          BINARY=$(find . -maxdepth 2 -type f -name clarinet 2>/dev/null | head -1)
+          mv "$BINARY" "$HOME/.cargo/bin/clarinet"
+          chmod +x "$HOME/.cargo/bin/clarinet"
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       
       - name: Check Contracts
