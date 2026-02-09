@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { ContractCallParams } from "@/lib/remittance-contracts";
+import type { ContractCallParams } from "@/lib/contracts";
 import {
   connectWallet,
   disconnectWallet,

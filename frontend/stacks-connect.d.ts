@@ -37,7 +37,8 @@ declare module "@stacks/connect" {
   
   // Per docs: const accounts = await request('stx_getAccounts');
   // Per docs: const response = await request('stx_transferStx', { amount, recipient, memo });
-  // Per docs: const response = await request('stx_callContract', { contractAddress, contractName, functionName, functionArgs });
+  // Leather API: request('stx_callContract', { contract: 'address.name', functionName, functionArgs })
+  // @see https://leather.io/posts/api-stx-callcontract
   export function request(
     method: string,
     options?: Record<string, unknown>

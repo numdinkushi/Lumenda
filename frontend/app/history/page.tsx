@@ -14,18 +14,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useWallet } from "@/contexts/wallet-context";
+import { useContractCall } from "@/hooks/use-contract-call";
+import { useRemittance } from "@/hooks/use-remittance";
 import {
   buildCancelTransferParams,
   buildCompleteTransferParams,
-  getTransfer,
-  getTransferCount,
   type Transfer,
-} from "@/lib/remittance-contracts";
+} from "@/lib/contracts";
 import { formatStx } from "@/lib/stx";
 import { toast } from "sonner";
 
 export default function HistoryPage() {
-  const { address, requestContractCall } = useWallet();
+  const { address } = useWallet();
+  const { execute: executeContractCall } = useContractCall();
+  const { loadTransfer, loadTransferCount } = useRemittance();
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<number | null>(null);
@@ -38,10 +40,14 @@ export default function HistoryPage() {
     }
     setLoading(true);
     try {
-      const count = await getTransferCount();
+      const count = await loadTransferCount();
+      if (count === null) {
+        setTransfers([]);
+        return;
+      }
       const list: Transfer[] = [];
       for (let id = 1; id <= count; id++) {
-        const t = await getTransfer(id);
+        const t = await loadTransfer(id);
         if (t && (t.sender === address || t.recipient === address)) list.push(t);
       }
       list.sort((a, b) => b.createdAt - a.createdAt);
@@ -53,23 +59,17 @@ export default function HistoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [address]);
-
-  useEffect(() => {
-    loadTransfers();
-  }, [loadTransfers]);
+  }, [address, loadTransfer, loadTransferCount]);
 
   const onComplete = async (t: Transfer) => {
     if (t.status !== "pending" || t.recipient !== address) return;
     setActingId(t.id);
     try {
       const params = buildCompleteTransferParams(t.id);
-      const txId = await requestContractCall(params);
+      const txId = await executeContractCall(params);
       if (txId) {
         toast.success("Transfer completed");
         await loadTransfers();
-      } else {
-        toast.error("Transaction not sent. Connect a Stacks wallet to sign.");
       }
     } catch (err) {
       toast.error("Complete failed");
@@ -84,12 +84,10 @@ export default function HistoryPage() {
     setActingId(t.id);
     try {
       const params = buildCancelTransferParams(t.id);
-      const txId = await requestContractCall(params);
+      const txId = await executeContractCall(params);
       if (txId) {
         toast.success("Transfer cancelled");
         await loadTransfers();
-      } else {
-        toast.error("Transaction not sent. Connect a Stacks wallet to sign.");
       }
     } catch (err) {
       toast.error("Cancel failed");
@@ -98,6 +96,10 @@ export default function HistoryPage() {
       setActingId(null);
     }
   };
+
+  useEffect(() => {
+    void loadTransfers();
+  }, [loadTransfers]);
 
   return (
     <RequireWallet>

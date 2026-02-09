@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useStacksWallet } from "@/hooks/use-stacks-wallet";
-import type { ContractCallParams } from "@/lib/remittance-contracts";
+import type { ContractCallParams } from "@/lib/contracts";
 
 export type WalletContextValue = {
   isConnected: boolean;

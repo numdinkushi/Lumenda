@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout";
 import { RequireWallet } from "@/components/auth/require-wallet";
@@ -15,29 +15,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { getFeeRate } from "@/lib/remittance-contracts";
+import { useFeeRate } from "@/hooks/use-fee-rate";
 import { formatStx, stxToMicroStx } from "@/lib/stx";
 
 export default function FeesPage() {
-  const [feeRateBps, setFeeRateBps] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { feeRate, loading } = useFeeRate();
   const [calcAmount, setCalcAmount] = useState("");
 
-  const loadFee = useCallback(async () => {
-    setLoading(true);
-    try {
-      const rate = await getFeeRate();
-      setFeeRateBps(Number(rate));
-    } catch {
-      setFeeRateBps(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadFee();
-  }, [loadFee]);
+  const feeRateBps = feeRate ? Number(feeRate) : null;
 
   const amountMicro = calcAmount.trim() ? stxToMicroStx(calcAmount) : BigInt(0);
   const feeMicro =
