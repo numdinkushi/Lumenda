@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout";
 import { RequireWallet } from "@/components/auth/require-wallet";
@@ -15,12 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { useWallet } from "@/contexts/wallet-context";
-import {
-  buildInitiateTransferParams,
-  getFeeRate,
-  getPausedStatus,
-} from "@/lib/remittance-contracts";
+import { useContractCall } from "@/hooks/use-contract-call";
+import { useRemittance } from "@/hooks/use-remittance";
+import { useFeeRate } from "@/hooks/use-fee-rate";
+import { buildInitiateTransferParams } from "@/lib/contracts";
 import {
   formatStx,
   remittanceErrorToMessage,
@@ -29,38 +27,26 @@ import {
 import { toast } from "sonner";
 
 export default function SendPage() {
-  const { requestContractCall } = useWallet();
+  const { execute: executeContractCall, loading: calling } = useContractCall();
+  const { paused, loadPausedStatus } = useRemittance();
+  const { feeRate, loading: feeLoading } = useFeeRate();
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
-  const [feeRateBps, setFeeRateBps] = useState<number | null>(null);
-  const [paused, setPaused] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
 
-  const loadFeeAndPaused = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [rate, isPaused] = await Promise.all([getFeeRate(), getPausedStatus()]);
-      setFeeRateBps(Number(rate));
-      setPaused(!!isPaused);
-    } catch (e) {
-      toast.error("Failed to load fee rate");
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadFeeAndPaused();
-  }, [loadFeeAndPaused]);
+  // Load paused status on mount
+  useState(() => {
+    void loadPausedStatus();
+  });
 
   const amountMicro = amount.trim() ? stxToMicroStx(amount) : BigInt(0);
+  const feeRateBps = feeRate ? Number(feeRate) : null;
   const feeMicro =
     feeRateBps != null && amountMicro > 0
       ? (amountMicro * BigInt(feeRateBps)) / BigInt(10000)
       : BigInt(0);
   const totalMicro = amountMicro + feeMicro;
+  const loading = feeLoading || calling;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,14 +65,14 @@ export default function SendPage() {
     setSending(true);
     try {
       const params = buildInitiateTransferParams(recipient.trim(), amountMicro);
-      const txId = await requestContractCall(params);
+      const txId = await executeContractCall(params);
       if (txId) {
         toast.success("Transfer initiated");
         setAmount("");
         setRecipient("");
-      } else {
-        toast.error("Transaction was not sent. Connect a Stacks wallet to sign.");
+        await loadPausedStatus();
       }
+      // When txId is null, useContractCall already toasts; ensure loading ends in finally
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "message" in err
@@ -162,7 +148,7 @@ export default function SendPage() {
                     className="w-full"
                     disabled={paused || loading || sending || amountMicro <= 0 || !recipient.trim()}
                   >
-                    {sending ? (
+                    {sending || calling ? (
                       <>
                         <Loader2 className="size-4 animate-spin mr-2" />
                         Sending…

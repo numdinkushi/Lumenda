@@ -5,7 +5,8 @@
  * Note: We use dynamic imports to avoid SSR issues, but the modal should still work.
  */
 
-import type { ContractCallParams } from "@/lib/remittance-contracts";
+import { getContractAddresses } from "@/config/contracts";
+import type { ContractCallParams } from "@/lib/contracts";
 import { getStoredAddress, setStoredAddress } from "./storage";
 
 // Lazy load @stacks/connect to avoid SSR issues
@@ -208,6 +209,11 @@ export function getCachedAddress(): string | null {
 /**
  * Request the wallet to sign and broadcast a contract call.
  * Returns txid on success, null on cancel or error.
+ *
+ * Leather expects: contract (fully qualified "address.name"), functionName, functionArgs.
+ * Passing network ensures the wallet looks up the contract on the correct chain (testnet/mainnet);
+ * otherwise "Not a valid contract" can appear if the wallet is on a different network.
+ * @see https://leather.io/posts/api-stx-callcontract
  */
 export async function requestContractCall(
   params: ContractCallParams
@@ -222,16 +228,28 @@ export async function requestContractCall(
     };
     if (typeof mod.request !== "function") return null;
 
-    const result = await mod.request("stx_callContract", {
-      contractAddress: params.contractAddress,
-      contractName: params.contractName,
+    const { network } = getContractAddresses();
+    const contract = `${params.contractAddress}.${params.contractName}`;
+    const payload: Record<string, unknown> = {
+      contract,
       functionName: params.functionName,
       functionArgs: params.functionArgs,
-    });
+    };
+    // Ensure wallet uses the same network as app (avoids "Not a valid contract" on testnet)
+    if (network) payload.network = network;
+
+    const result = await mod.request("stx_callContract", payload);
 
     return result?.txId ?? result?.txid ?? null;
   } catch (err) {
-    console.error("[stacks-connect] requestContractCall failed:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    const isUserRejection =
+      /rejected|denied|cancel|user said no/i.test(msg) || msg === "User rejected request";
+    if (!isUserRejection) {
+      console.error("[stacks-connect] requestContractCall failed:", err);
+    }
+    // Rethrow so the hook can show "Transaction cancelled" instead of a generic error
+    if (isUserRejection) throw err;
     return null;
   }
 }
