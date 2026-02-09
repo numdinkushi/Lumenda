@@ -7,6 +7,7 @@
 import {
   Cl,
   ClarityType,
+  cvToHex,
   hexToCV,
   principalToString,
   type ClarityValue,
@@ -65,7 +66,7 @@ export async function callReadOnlyFunction(
       const explorerLink = `${getExplorerUrl()}/address/${contractAddress}?chain=${networkName}`;
       throw new Error(
         `Contract not deployed: ${contractName}. The API could not find contract data. ` +
-          `Verify on explorer: ${explorerLink} and ensure you're on ${networkName}.`
+        `Verify on explorer: ${explorerLink} and ensure you're on ${networkName}.`
       );
     }
     if (cause.includes("NoSuchContract")) {
@@ -75,8 +76,8 @@ export async function callReadOnlyFunction(
       const explorerLink = `${getExplorerUrl()}/address/${contractAddress}?chain=${networkName}`;
       throw new Error(
         `Contract not deployed: ${contractIdFromError}. The API returned NoSuchContract. ` +
-          `Open /verify and compare with explorer: ${explorerLink}. ` +
-          `Set NEXT_PUBLIC_STACKS_NETWORK=${networkName} and restart dev server.`
+        `Open /verify and compare with explorer: ${explorerLink}. ` +
+        `Set NEXT_PUBLIC_STACKS_NETWORK=${networkName} and restart dev server.`
       );
     }
     if (cause.includes("fetch") || cause.includes("Failed to fetch") || cause.includes("Network")) {

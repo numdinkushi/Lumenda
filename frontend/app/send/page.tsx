@@ -117,7 +117,7 @@ export default function SendPage() {
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       className="bg-background/50"
-                      disabled={paused}
+                      disabled={paused === true}
                     />
                   </div>
                   <div className="space-y-2">
@@ -129,7 +129,7 @@ export default function SendPage() {
                       value={recipient}
                       onChange={(e) => setRecipient(e.target.value)}
                       className="bg-background/50 font-mono text-sm"
-                      disabled={paused}
+                      disabled={paused === true}
                     />
                   </div>
                   {loading ? (
@@ -146,7 +146,7 @@ export default function SendPage() {
                   <Button
                     type="submit"
                     className="w-full"
-                    disabled={paused || loading || sending || amountMicro <= 0 || !recipient.trim()}
+                    disabled={paused === true || loading || sending || amountMicro <= 0 || !recipient.trim()}
                   >
                     {sending || calling ? (
                       <>
