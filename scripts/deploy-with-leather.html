@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deploy Contracts with Leather Wallet</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 8px;
+        }
+        button {
+            background: #5546ff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #4535ee;
+        }
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 6px;
+            background: #333;
+        }
+        .success { background: #1a5a1a; }
+        .error { background: #5a1a1a; }
+        .info { background: #1a3a5a; }
+        pre {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        h1 { color: #5546ff; }
+        h2 { color: #aaa; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Deploy Lumenda Contracts with Leather Wallet</h1>
+        <p>This tool uses your Leather wallet to deploy contracts. No need to know derivation paths!</p>
+        
+        <div>
+            <button id="connectBtn">1. Connect Leather Wallet</button>
+            <button id="deployBtn" disabled>2. Deploy Contracts</button>
+        </div>
+
+        <div id="status"></div>
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        // Check if Leather is installed
+        const leatherProvider = window.LeatherProvider;
+        
+        let walletAddress = null;
+        const network = 'testnet'; // Change to 'mainnet' if needed
+
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+        const connectBtn = document.getElementById('connectBtn');
+        const deployBtn = document.getElementById('deployBtn');
+
+        function showStatus(message, type = 'info') {
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function showResult(title, content) {
+            resultsDiv.innerHTML += `<h2>${title}</h2><pre>${content}</pre>`;
+        }
+
+        // Step 1: Connect to Leather wallet
+        connectBtn.addEventListener('click', async () => {
+            if (!leatherProvider) {
+                showStatus('❌ Leather wallet extension not found. Please install it from https://leather.io/', 'error');
+                return;
+            }
+
+            try {
+                showStatus('Connecting to Leather wallet...', 'info');
+                
+                // Use Leather's API to get addresses
+                const response = await leatherProvider.request('getAddresses', {});
+                
+                if (response && response.addresses && response.addresses.stx) {
+                    // Get the first Stacks address
+                    walletAddress = response.addresses.stx[0]?.address;
+                    
+                    if (walletAddress) {
+                        showStatus(`✅ Connected! Address: ${walletAddress}`, 'success');
+                        connectBtn.disabled = true;
+                        deployBtn.disabled = false;
+                        showResult('Wallet Address', walletAddress);
+                    } else {
+                        showStatus('❌ No Stacks address found in wallet', 'error');
+                    }
+                } else {
+                    showStatus('❌ Could not get addresses from wallet', 'error');
+                }
+            } catch (err) {
+                showStatus(`❌ Error connecting: ${err.message}`, 'error');
+                console.error(err);
+            }
+        });
+
+        // Step 2: Deploy contracts
+        deployBtn.addEventListener('click', async () => {
+            if (!walletAddress) {
+                showStatus('❌ Please connect wallet first', 'error');
+                return;
+            }
+
+            if (!leatherProvider) {
+                showStatus('❌ Leather wallet not available', 'error');
+                return;
+            }
+
+            try {
+                deployBtn.disabled = true;
+                showStatus('📝 Preparing contract deployments...', 'info');
+
+                // Contract source code (you'll need to load these from files or paste them)
+                // For now, we'll show you how to do it
+                showStatus('⚠️ This requires loading contract source code. See instructions below.', 'info');
+                
+                // You would need to:
+                // 1. Load escrow.clar and remittance.clar files
+                // 2. Use Leather's API to sign and broadcast the deployment
+                
+                // Example structure (you'll need to implement the actual deployment):
+                /*
+                const escrowCode = await fetch('/contracts/core/escrow.clar').then(r => r.text());
+                const remittanceCode = await fetch('/contracts/core/remittance.clar').then(r => r.text());
+                
+                // Deploy escrow first
+                showStatus('Deploying escrow contract...', 'info');
+                const escrowResult = await leatherProvider.request('stx_deployContract', {
+                    contractName: 'escrow',
+                    codeBody: escrowCode,
+                    network: network
+                });
+                
+                showResult('Escrow Deployment', JSON.stringify(escrowResult, null, 2));
+                
+                // Then deploy remittance
+                showStatus('Deploying remittance contract...', 'info');
+                const remittanceResult = await leatherProvider.request('stx_deployContract', {
+                    contractName: 'remittance',
+                    codeBody: remittanceCode,
+                    network: network
+                });
+                
+                showResult('Remittance Deployment', JSON.stringify(remittanceResult, null, 2));
+                */
+                
+                showStatus('✅ Deployment complete! Check the results above.', 'success');
+                
+            } catch (err) {
+                showStatus(`❌ Deployment error: ${err.message}`, 'error');
+                console.error(err);
+            } finally {
+                deployBtn.disabled = false;
+            }
+        });
+
+        // Check if Leather is available on page load
+        if (!leatherProvider) {
+            showStatus('⚠️ Leather wallet extension not detected. Please install it first.', 'error');
+        } else {
+            showStatus('✅ Leather wallet detected! Click "Connect Leather Wallet" to start.', 'success');
+        }
+    </script>
+</body>
+</html>

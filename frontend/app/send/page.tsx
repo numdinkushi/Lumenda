@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout";
 import { RequireWallet } from "@/components/auth/require-wallet";
@@ -15,10 +15,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Loader2 } from "lucide-react";
+import { useWallet } from "@/contexts/wallet-context";
 import { useContractCall } from "@/hooks/use-contract-call";
 import { useRemittance } from "@/hooks/use-remittance";
 import { useFeeRate } from "@/hooks/use-fee-rate";
 import { buildInitiateTransferParams } from "@/lib/contracts";
+import { getContractAddresses } from "@/config/contracts";
 import {
   formatStx,
   remittanceErrorToMessage,
@@ -27,6 +29,7 @@ import {
 import { toast } from "sonner";
 
 export default function SendPage() {
+  const { address } = useWallet();
   const { execute: executeContractCall, loading: calling } = useContractCall();
   const { paused, loadPausedStatus } = useRemittance();
   const { feeRate, loading: feeLoading } = useFeeRate();
@@ -62,12 +65,35 @@ export default function SendPage() {
       toast.error("Enter recipient address");
       return;
     }
+    if (address && recipient.trim().toUpperCase() === address.toUpperCase()) {
+      toast.error("Cannot send to yourself. Please use a different recipient address.");
+      return;
+    }
     setSending(true);
     try {
       const params = buildInitiateTransferParams(recipient.trim(), amountMicro);
       const txId = await executeContractCall(params);
       if (txId) {
-        toast.success("Transfer initiated");
+        const { network, explorerUrl } = getContractAddresses();
+        const chainParam = network === "testnet" ? "?chain=testnet" : "";
+        const fullExplorerUrl = `${explorerUrl}/txid/${txId}${chainParam}`;
+        toast.success(
+          <div className="space-y-1">
+            <p>Transaction submitted</p>
+            <a
+              href={fullExplorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs underline text-blue-400 hover:text-blue-300 block"
+            >
+              View on explorer (tx: {txId.slice(0, 8)}...)
+            </a>
+            <p className="text-xs text-muted-foreground">
+              Check your Leather wallet to approve. Transaction may take 1-2 minutes to confirm.
+            </p>
+          </div>,
+          { duration: 10000 }
+        );
         setAmount("");
         setRecipient("");
         await loadPausedStatus();
@@ -76,9 +102,9 @@ export default function SendPage() {
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "message" in err
-          ? String((err as { message: string }).message)
+          ? String((err as { message: string; }).message)
           : "Transaction failed";
-      const code = typeof err === "object" && err && "code" in err ? Number((err as { code: number }).code) : undefined;
+      const code = typeof err === "object" && err && "code" in err ? Number((err as { code: number; }).code) : undefined;
       toast.error(code != null ? remittanceErrorToMessage(code) : msg);
     } finally {
       setSending(false);
