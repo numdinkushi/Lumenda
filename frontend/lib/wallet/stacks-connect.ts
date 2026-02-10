@@ -79,15 +79,20 @@ export async function connectWallet(): Promise<ConnectResult | null> {
     if (typeof mod.isConnected === "function") {
       const isConnectedFn = mod.isConnected as () => boolean;
       if (isConnectedFn()) {
-        console.log("[stacks-connect] Already connected, getting address from localStorage...");
+        console.log("[stacks-connect] Already connected, getting Stacks address from localStorage...");
         // Get address from localStorage (per docs: getLocalStorage())
+        // IMPORTANT: This app is Stacks-only, so we MUST use the STX address, not BTC
         if (typeof mod.getLocalStorage === "function") {
           const userData = (mod.getLocalStorage as () => { addresses?: { stx?: Array<{ address: string }>; btc?: Array<{ address: string }> } } | null)();
           if (userData?.addresses?.stx && userData.addresses.stx.length > 0) {
             const addr = userData.addresses.stx[0].address;
-            console.log("[stacks-connect] Found existing connection, address:", addr);
-            setStoredAddress(addr);
-            return { address: addr };
+            // Validate it's a Stacks address (starts with ST)
+            if (addr && typeof addr === "string" && addr.startsWith("ST")) {
+              console.log("[stacks-connect] Found existing Stacks connection, address:", addr);
+              setStoredAddress(addr);
+              return { address: addr };
+            }
+            console.warn("[stacks-connect] Found STX address but invalid format:", addr);
           }
         }
       }
@@ -108,52 +113,49 @@ export async function connectWallet(): Promise<ConnectResult | null> {
         const responseObj = response as Record<string, unknown>;
         
         // Per docs: { addresses: { stx: [{ address }], btc: [...] } }
+        // IMPORTANT: This app is Stacks-only, so we MUST use the STX address, not BTC
         if (responseObj.addresses && typeof responseObj.addresses === "object") {
           const addresses = responseObj.addresses as Record<string, unknown>;
           
-          // Try stx array
+          // Require STX address (Stacks address starts with ST)
           if (addresses.stx && Array.isArray(addresses.stx) && addresses.stx.length > 0) {
             const first = addresses.stx[0];
             if (first && typeof first === "object" && "address" in first) {
               const address = (first as { address: string }).address;
-              if (typeof address === "string" && address.length > 0) {
-                console.log("[stacks-connect] Successfully connected, address:", address);
+              if (typeof address === "string" && address.length > 0 && address.startsWith("ST")) {
+                console.log("[stacks-connect] Successfully connected with Stacks address:", address);
                 setStoredAddress(address);
                 return { address };
               }
+              console.warn("[stacks-connect] STX address found but invalid format (must start with ST):", address);
             }
           }
           
-          // Try btc array (fallback)
-          if (addresses.btc && Array.isArray(addresses.btc) && addresses.btc.length > 0) {
-            const first = addresses.btc[0];
-            if (first && typeof first === "object" && "address" in first) {
-              const address = (first as { address: string }).address;
-              if (typeof address === "string" && address.length > 0) {
-                console.log("[stacks-connect] Successfully connected (BTC address), address:", address);
-                setStoredAddress(address);
-                return { address };
-              }
-            }
+          // If we have BTC but no STX, that's an error for this app
+          if (addresses.btc && (!addresses.stx || (Array.isArray(addresses.stx) && addresses.stx.length === 0))) {
+            console.error("[stacks-connect] Wallet returned BTC address but no STX address. This app requires Stacks (STX).");
+            throw new Error("Wallet connected but no Stacks (STX) address found. Please ensure your wallet has a Stacks account enabled.");
           }
         }
         
         // Fallback: check if response has addresses as array directly
+        // Only accept if it's a Stacks address (ST prefix)
         if (Array.isArray(responseObj.addresses) && responseObj.addresses.length > 0) {
           const first = responseObj.addresses[0];
           if (first && typeof first === "object" && "address" in first) {
             const address = (first as { address: string }).address;
-            if (typeof address === "string" && address.length > 0) {
-              console.log("[stacks-connect] Successfully connected (array format), address:", address);
+            if (typeof address === "string" && address.length > 0 && address.startsWith("ST")) {
+              console.log("[stacks-connect] Successfully connected with Stacks address (array format):", address);
               setStoredAddress(address);
               return { address };
             }
+            console.warn("[stacks-connect] Address from array format is not a Stacks address (must start with ST):", address);
           }
         }
         
         // If we get here, log the full response for debugging
-        console.warn("[stacks-connect] connect() succeeded but couldn't extract address. Response:", response);
-        throw new Error("Wallet connected but no address found in response. Check console for details.");
+        console.warn("[stacks-connect] connect() succeeded but couldn't extract Stacks address. Response:", response);
+        throw new Error("Wallet connected but no Stacks (STX) address found. This app requires a Stacks account. Check console for details.");
       } catch (connectErr) {
         console.error("[stacks-connect] connect() failed:", connectErr);
         const errMsg = connectErr instanceof Error ? connectErr.message : String(connectErr);
