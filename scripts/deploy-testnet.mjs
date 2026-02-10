@@ -53,6 +53,10 @@ const DERIVATION_ADDRESS = parseInt(process.env.DEPLOYER_ADDRESS_INDEX ?? '0', 1
 const TARGET_DEPLOYER_ADDRESS = process.env.DEPLOYER_ADDRESS?.trim().toUpperCase() || null;
 /** Set DEBUG_DERIVATION=1 to print first few derived addresses and hash160s (to verify mnemonic/path). */
 const DEBUG_DERIVATION = process.env.DEBUG_DERIVATION === '1' || process.env.DEBUG_DERIVATION === 'true';
+/** BIP39 passphrase (optional). Some wallets use a passphrase with the mnemonic. */
+const BIP39_PASSPHRASE = process.env.BIP39_PASSPHRASE || '';
+/** Manual derivation path override (e.g., "m/44'/5757'/0'/0/123"). If set, uses this exact path instead of searching. */
+const MANUAL_DERIVATION_PATH = process.env.MANUAL_DERIVATION_PATH?.trim() || null;
 
 /** Normalize mnemonic: one line, single spaces (handles paste with newlines or extra spaces). */
 function normalizeMnemonic(s) {
@@ -64,8 +68,32 @@ async function getSenderKey() {
   if (KEY_HEX && (KEY_HEX.length === 64 || KEY_HEX.length === 66)) return KEY_HEX.slice(0, 64);
   const mnemonic = normalizeMnemonic(process.env.DEPLOYER_SECRET_KEY);
   if (mnemonic && mnemonic.split(' ').filter(Boolean).length >= 12) {
-    const seed = await bip39.mnemonicToSeed(mnemonic);
+    // Use BIP39 passphrase if provided (some wallets like Leather may use this)
+    const seed = BIP39_PASSPHRASE 
+      ? await bip39.mnemonicToSeed(mnemonic, BIP39_PASSPHRASE)
+      : await bip39.mnemonicToSeed(mnemonic);
     const bip32 = BIP32Factory(ecc);
+    
+    // If manual derivation path is specified, use it directly
+    if (MANUAL_DERIVATION_PATH) {
+      try {
+        console.log(`Using manual derivation path: ${MANUAL_DERIVATION_PATH}`);
+        const node = bip32.fromSeed(seed).derivePath(MANUAL_DERIVATION_PATH);
+        if (node.privateKey) {
+          const keyHex = Buffer.from(node.privateKey).toString('hex');
+          const derived = getAddressFromPrivateKey(keyHex, TransactionVersion.Testnet);
+          console.log(`Derived address: ${derived}`);
+          if (TARGET_DEPLOYER_ADDRESS && derived.toUpperCase() !== TARGET_DEPLOYER_ADDRESS) {
+            console.warn(`Warning: Manual path gives ${derived}, but TARGET_DEPLOYER_ADDRESS is ${TARGET_DEPLOYER_ADDRESS}`);
+          }
+          return keyHex;
+        }
+      } catch (e) {
+        console.error(`Failed to derive from manual path ${MANUAL_DERIVATION_PATH}:`, e.message);
+        process.exit(1);
+      }
+    }
+    
     if (TARGET_DEPLOYER_ADDRESS) {
       const normHash = (h) => (h || '').toLowerCase().replace(/^0x/, '').padStart(40, '0').slice(-40);
       let targetHash160;
@@ -76,10 +104,58 @@ async function getSenderKey() {
         console.error('Invalid DEPLOYER_ADDRESS (not a valid Stacks address):', TARGET_DEPLOYER_ADDRESS);
         process.exit(1);
       }
+      
+      console.log(`Searching for address ${TARGET_DEPLOYER_ADDRESS}...`);
+      console.log('Trying common Leather wallet paths first, then expanding search...');
+      
+      // Common paths to try first (Leather/Hiro wallet patterns)
+      const commonPaths = [
+        // Standard BIP44 with hardened accounts
+        "m/44'/5757'/0'/0/0",
+        "m/44'/5757'/0'/0/1",
+        "m/44'/5757'/0'/0/2",
+        "m/44'/5757'/0'/1/0",
+        "m/44'/5757'/1'/0/0",
+        // Non-hardened accounts (some wallets use this)
+        "m/44'/5757'/0/0/0",
+        "m/44'/5757'/0/0/1",
+        "m/44'/5757'/0/1/0",
+        "m/44'/5757'/1/0/0",
+      ];
+      
       let debugCount = 0;
+      let pathsTried = 0;
+      let lastProgressUpdate = Date.now();
+      
+      // Try common paths first
+      for (const pathStr of commonPaths) {
+        try {
+          const node = bip32.fromSeed(seed).derivePath(pathStr);
+          if (node.privateKey) {
+            const keyHex = Buffer.from(node.privateKey).toString('hex');
+            const derived = getAddressFromPrivateKey(keyHex, TransactionVersion.Testnet);
+            const [, derivedHash160] = c32addressDecode(derived);
+            pathsTried++;
+            
+            if (DEBUG_DERIVATION || pathsTried <= 10) {
+              console.log(`[${pathsTried}] Trying ${pathStr} -> ${derived}`);
+            }
+            
+            const derivedMatch = derived.toUpperCase() === TARGET_DEPLOYER_ADDRESS;
+            const hashMatch = normHash(derivedHash160) === targetHash160;
+            if (derivedMatch || hashMatch) {
+              console.log(`✓ Found matching address at path: ${pathStr}`);
+              return keyHex;
+            }
+          }
+        } catch (_) { /* skip invalid path */ }
+      }
+      
+      // Expanded search: hardened accounts with wider address range
+      console.log('Expanding search to more derivation paths...');
       for (const change of [0, 1]) {
-        for (let acc = 0; acc <= 19; acc++) {
-          for (let addr = 0; addr <= 99; addr++) {
+        for (let acc = 0; acc <= 49; acc++) { // Expanded from 19 to 49
+          for (let addr = 0; addr <= 499; addr++) { // Expanded from 99 to 499
             const path = `m/44'/5757'/${acc}'/${change}/${addr}`;
             try {
               const node = bip32.fromSeed(seed).derivePath(path);
@@ -87,18 +163,93 @@ async function getSenderKey() {
                 const keyHex = Buffer.from(node.privateKey).toString('hex');
                 const derived = getAddressFromPrivateKey(keyHex, TransactionVersion.Testnet);
                 const [, derivedHash160] = c32addressDecode(derived);
-                if (DEBUG_DERIVATION && debugCount < 5) {
-                  console.warn(`[DEBUG] path=${path} -> ${derived} hash160=${normHash(derivedHash160)}`);
-                  debugCount++;
+                pathsTried++;
+                
+                // Progress update every 1000 paths
+                if (pathsTried % 1000 === 0) {
+                  const now = Date.now();
+                  if (now - lastProgressUpdate > 2000) { // Update every 2 seconds max
+                    console.log(`  Searched ${pathsTried} paths... (account ${acc}, change ${change}, address ${addr})`);
+                    lastProgressUpdate = now;
+                  }
                 }
+                
                 const derivedMatch = derived.toUpperCase() === TARGET_DEPLOYER_ADDRESS;
                 const hashMatch = normHash(derivedHash160) === targetHash160;
-                if (derivedMatch || hashMatch) return keyHex;
+                if (derivedMatch || hashMatch) {
+                  console.log(`✓ Found matching address at path: ${path}`);
+                  return keyHex;
+                }
               }
             } catch (_) { /* skip invalid path */ }
           }
         }
       }
+      
+      // Try non-hardened accounts with wider range
+      console.log('Trying non-hardened account paths...');
+      for (const change of [0, 1]) {
+        for (let acc = 0; acc <= 49; acc++) {
+          for (let addr = 0; addr <= 499; addr++) {
+            const path = `m/44'/5757'/${acc}/${change}/${addr}`;
+            try {
+              const node = bip32.fromSeed(seed).derivePath(path);
+              if (node.privateKey) {
+                const keyHex = Buffer.from(node.privateKey).toString('hex');
+                const derived = getAddressFromPrivateKey(keyHex, TransactionVersion.Testnet);
+                const [, derivedHash160] = c32addressDecode(derived);
+                pathsTried++;
+                
+                if (pathsTried % 1000 === 0) {
+                  const now = Date.now();
+                  if (now - lastProgressUpdate > 2000) {
+                    console.log(`  Searched ${pathsTried} paths... (non-hardened account ${acc}, change ${change}, address ${addr})`);
+                    lastProgressUpdate = now;
+                  }
+                }
+                
+                const derivedMatch = derived.toUpperCase() === TARGET_DEPLOYER_ADDRESS;
+                const hashMatch = normHash(derivedHash160) === targetHash160;
+                if (derivedMatch || hashMatch) {
+                  console.log(`✓ Found matching address at path: ${path}`);
+                  return keyHex;
+                }
+              }
+            } catch (_) { /* skip invalid path */ }
+          }
+        }
+      }
+      
+      console.log(`\nSearched ${pathsTried} derivation paths but could not find ${TARGET_DEPLOYER_ADDRESS}`);
+      console.log('This might mean:');
+      console.log('  1. The mnemonic does not derive to this address');
+      console.log('  2. Leather uses a derivation path outside the searched range');
+      console.log('  3. The address belongs to a different seed phrase');
+      console.log('\nTrying one more time with even wider search (this may take a while)...');
+      
+      // Last resort: try even wider ranges for account 0 (most common)
+      for (let addr = 500; addr <= 999; addr++) {
+        for (const change of [0, 1]) {
+          const path = `m/44'/5757'/0'/${change}/${addr}`;
+          try {
+            const node = bip32.fromSeed(seed).derivePath(path);
+            if (node.privateKey) {
+              const keyHex = Buffer.from(node.privateKey).toString('hex');
+              const derived = getAddressFromPrivateKey(keyHex, TransactionVersion.Testnet);
+              const [, derivedHash160] = c32addressDecode(derived);
+              pathsTried++;
+              
+              const derivedMatch = derived.toUpperCase() === TARGET_DEPLOYER_ADDRESS;
+              const hashMatch = normHash(derivedHash160) === targetHash160;
+              if (derivedMatch || hashMatch) {
+                console.log(`✓ Found matching address at path: ${path}`);
+                return keyHex;
+              }
+            }
+          } catch (_) { /* skip invalid path */ }
+        }
+      }
+      
       const firstKeyHex = (() => {
         try {
           const n = bip32.fromSeed(seed).derivePath("m/44'/5757'/0'/0/0");
@@ -107,12 +258,16 @@ async function getSenderKey() {
       })();
       const firstAddress = firstKeyHex ? getAddressFromPrivateKey(firstKeyHex, TransactionVersion.Testnet) : null;
       if (firstKeyHex && firstAddress) {
-        console.warn('DEPLOYER_ADDRESS=' + TARGET_DEPLOYER_ADDRESS + ' not found from mnemonic (tried paths m/44\'/5757\'/0-19\'/0-1/0-99). Using derived address ' + firstAddress + '.');
-        console.warn('To deploy from ' + TARGET_DEPLOYER_ADDRESS + ': set DEPLOYER_PRIVATE_KEY in .env to that address\'s 64-char hex private key (export from wallet if supported), then remove DEPLOYER_ADDRESS and DEPLOYER_SECRET_KEY. Or send testnet STX from ' + TARGET_DEPLOYER_ADDRESS + ' to ' + firstAddress + ' and run again.');
-        return firstKeyHex;
+        console.error(`\n✗ Could not find ${TARGET_DEPLOYER_ADDRESS} after searching ${pathsTried} paths.`);
+        console.error(`  Default derivation (m/44'/5757'/0'/0/0) gives: ${firstAddress}`);
+        console.error('\nOptions:');
+        console.error('  1. Verify the mnemonic matches the wallet that owns ' + TARGET_DEPLOYER_ADDRESS);
+        console.error('  2. Set DEPLOYER_PRIVATE_KEY in .env to the 64-char hex private key for ' + TARGET_DEPLOYER_ADDRESS);
+        console.error('  3. Send testnet STX from ' + TARGET_DEPLOYER_ADDRESS + ' to ' + firstAddress + ' and deploy from there');
+        process.exit(1);
       }
-      console.error('DEPLOYER_ADDRESS=' + TARGET_DEPLOYER_ADDRESS + ' not found from mnemonic (tried paths m/44\'/5757\'/0-19\'/0-1/0-99).');
-      console.error('To use ' + TARGET_DEPLOYER_ADDRESS + ' you must set DEPLOYER_PRIVATE_KEY=<64-char-hex> in .env (the private key for that address). Leather does not expose this in the UI.');
+      console.error('DEPLOYER_ADDRESS=' + TARGET_DEPLOYER_ADDRESS + ' not found from mnemonic.');
+      console.error('To use ' + TARGET_DEPLOYER_ADDRESS + ' you must set DEPLOYER_PRIVATE_KEY=<64-char-hex> in .env (the private key for that address).');
       process.exit(1);
     }
     const path = `m/44'/5757'/${DERIVATION_ACCOUNT}'/0/${DERIVATION_ADDRESS}`;
@@ -229,25 +384,151 @@ async function main() {
   const FEE_MICROSTX_ESCROW = Math.ceil((Buffer.byteLength(escrowBody, 'utf8') + 1024) * 1.5);
   const FEE_MICROSTX_REMITTANCE = Math.ceil((Buffer.byteLength(remittanceBody, 'utf8') + 1024) * 1.5);
 
+  /** Wait for a transaction to be confirmed on-chain */
+  async function waitForConfirmation(txid, maxWaitSeconds = 300) {
+    const startTime = Date.now();
+    const maxWait = maxWaitSeconds * 1000;
+    console.log(`Waiting for transaction ${txid} to confirm...`);
+    
+    while (Date.now() - startTime < maxWait) {
+      try {
+        const url = `${RPC}/extended/v1/tx/${txid}`;
+        const res = await fetchWithTimeout(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.tx_status === 'success') {
+            console.log(`✓ Transaction confirmed: ${txid}`);
+            return true;
+          } else if (data.tx_status === 'abort_by_response' || data.tx_status === 'abort_by_post_condition') {
+            console.error(`✗ Transaction failed: ${data.tx_status}`);
+            if (data.tx_result) {
+              console.error(`Error: ${data.tx_result}`);
+            }
+            return false;
+          }
+          // Still pending, wait and retry
+          await new Promise((r) => setTimeout(r, 5000)); // Wait 5 seconds
+        }
+      } catch (e) {
+        // Network error, retry
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+    }
+    console.warn(`⚠ Transaction not confirmed after ${maxWaitSeconds} seconds, continuing anyway...`);
+    return false;
+  }
+
+  /** Check if a contract already exists */
+  async function contractExists(contractName) {
+    try {
+      const url = `${RPC}/v2/contracts/${deployerAddress}/${contractName}`;
+      const res = await fetchWithTimeout(url);
+      if (res.ok) {
+        const data = await res.json();
+        return !!data.contract_id;
+      }
+    } catch (e) {
+      // Contract doesn't exist or not accessible yet
+    }
+    return false;
+  }
+
   const runDeploys = async () => {
     const txOptions = { senderKey, network };
-    console.log('Deploying escrow...');
-    const escrowTx = await makeContractDeploy({
-      contractName: 'escrow',
-      codeBody: escrowBody,
-      fee: FEE_MICROSTX_ESCROW,
-      ...txOptions,
-    });
-    await broadcastWithRetry(escrowTx, 'escrow');
+    
+    // Check if escrow already exists
+    const escrowExists = await contractExists('escrow');
+    let escrowResult = null;
+    
+    if (escrowExists) {
+      console.log('✓ Escrow contract already exists, skipping deployment');
+    } else {
+      console.log('Deploying escrow...');
+      try {
+        const escrowTx = await makeContractDeploy({
+          contractName: 'escrow',
+          codeBody: escrowBody,
+          fee: FEE_MICROSTX_ESCROW,
+          ...txOptions,
+        });
+        escrowResult = await broadcastWithRetry(escrowTx, 'escrow');
+      
+        if (!escrowResult || !escrowResult.txid) {
+          throw new Error('Escrow deployment failed - no transaction ID returned');
+        }
 
-    console.log('Deploying remittance...');
-    const remittanceTx = await makeContractDeploy({
-      contractName: 'remittance',
-      codeBody: remittanceBody,
-      fee: FEE_MICROSTX_REMITTANCE,
-      ...txOptions,
-    });
-    await broadcastWithRetry(remittanceTx, 'remittance');
+        // CRITICAL: Wait for escrow to confirm before deploying remittance
+        console.log('\nWaiting for escrow contract to confirm on-chain...');
+        const escrowConfirmed = await waitForConfirmation(escrowResult.txid, 300);
+      
+      if (!escrowConfirmed) {
+        throw new Error('Escrow deployment did not confirm. Remittance cannot be deployed until escrow is live.');
+      }
+
+      // Verify escrow contract exists before proceeding
+      console.log('Verifying escrow contract is accessible via RPC (this may take 1-2 minutes)...');
+      let escrowVerified = false;
+      for (let i = 0; i < 30; i++) { // Try for up to 2.5 minutes (30 * 5 seconds)
+        try {
+          const url = `${RPC}/v2/contracts/${deployerAddress}/escrow`;
+          const res = await fetchWithTimeout(url);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.contract_id) {
+              console.log(`✓ Escrow contract verified: ${data.contract_id}`);
+              escrowVerified = true;
+              break;
+            }
+          }
+        } catch (e) {
+          // Continue trying
+        }
+        if (i < 29) { // Don't wait on last iteration
+          process.stdout.write(`  Attempt ${i + 1}/30...\r`);
+          await new Promise((r) => setTimeout(r, 5000)); // Wait 5 seconds between checks
+        }
+      }
+      console.log(''); // New line after progress
+
+      if (!escrowVerified) {
+        console.warn('⚠ Escrow contract not yet accessible via RPC API.');
+        console.warn('This is normal - there can be a delay. The transaction is confirmed.');
+        console.warn('You can either:');
+        console.warn('  1. Wait 2-3 minutes and run: npm run deploy:testnet (it will skip escrow and deploy remittance)');
+        console.warn('  2. Or continue anyway (remittance may fail if escrow is not ready)');
+        console.warn('\nProceeding with remittance deployment anyway...');
+        }
+      } catch (e) {
+        if (e.reason === 'ContractAlreadyExists') {
+          console.log('✓ Escrow contract already exists (caught during deployment), continuing...');
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    // Check if remittance already exists
+    const remittanceExists = await contractExists('remittance');
+    if (remittanceExists) {
+      console.log('✓ Remittance contract already exists, skipping deployment');
+    } else {
+      console.log('\nDeploying remittance...');
+      try {
+        const remittanceTx = await makeContractDeploy({
+          contractName: 'remittance',
+          codeBody: remittanceBody,
+          fee: FEE_MICROSTX_REMITTANCE,
+          ...txOptions,
+        });
+        await broadcastWithRetry(remittanceTx, 'remittance');
+      } catch (e) {
+        if (e.reason === 'ContractAlreadyExists') {
+          console.log('✓ Remittance contract already exists (caught during deployment)');
+        } else {
+          throw e;
+        }
+      }
+    }
   };
 
   try {

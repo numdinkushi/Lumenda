@@ -8,8 +8,16 @@ const PREFIX = "lumenda:wallet";
 export const WALLET_ADDRESS_KEY = `${PREFIX}:address`;
 
 /**
+ * Validate that an address is a Stacks address (starts with ST).
+ * This app is Stacks-only, so we reject BTC addresses (tb1..., bc1..., etc.).
+ */
+function isValidStacksAddress(address: string): boolean {
+  return typeof address === "string" && address.length > 0 && address.startsWith("ST");
+}
+
+/**
  * Clear any invalid addresses from storage (call on app init).
- * Only clears addresses that look like placeholders/dummies.
+ * Clears addresses that look like placeholders/dummies or are not Stacks addresses.
  */
 export function clearPlaceholderAddresses(): void {
   const storage = getStorage();
@@ -19,9 +27,14 @@ export function clearPlaceholderAddresses(): void {
     if (value) {
       // Check for placeholder patterns (not real addresses)
       const upperValue = value.toUpperCase();
-      if (upperValue.includes("PLACEHOLDER") || upperValue.includes("DUMMY") || upperValue.includes("TEST")) {
+      if (
+        upperValue.includes("PLACEHOLDER") ||
+        upperValue.includes("DUMMY") ||
+        upperValue.includes("TEST") ||
+        !isValidStacksAddress(value)
+      ) {
         storage.removeItem(WALLET_ADDRESS_KEY);
-        console.log("[wallet/storage] Cleared placeholder-like address:", value);
+        console.log("[wallet/storage] Cleared invalid address (not a Stacks address):", value);
       }
     }
   } catch (err) {
@@ -44,9 +57,15 @@ export function getStoredAddress(): string | null {
   try {
     const value = storage.getItem(WALLET_ADDRESS_KEY);
     if (!value || value.length === 0) return null;
-    // Only filter out obvious placeholders
+    // Filter out placeholders and non-Stacks addresses (this app is Stacks-only)
     const upperValue = value.toUpperCase();
     if (upperValue.includes("PLACEHOLDER") || upperValue.includes("DUMMY")) {
+      storage.removeItem(WALLET_ADDRESS_KEY);
+      return null;
+    }
+    // Reject non-Stacks addresses (e.g. BTC addresses like tb1..., bc1...)
+    if (!isValidStacksAddress(value)) {
+      console.warn("[wallet/storage] Stored address is not a Stacks address, clearing:", value);
       storage.removeItem(WALLET_ADDRESS_KEY);
       return null;
     }
@@ -61,10 +80,15 @@ export function setStoredAddress(address: string | null): void {
   if (!storage) return;
   try {
     if (address) {
-      // Only filter out obvious placeholders
+      // Filter out placeholders
       const upperValue = address.toUpperCase();
       if (upperValue.includes("PLACEHOLDER") || upperValue.includes("DUMMY")) {
         console.warn("[wallet/storage] Attempted to save placeholder address, ignoring");
+        return;
+      }
+      // Reject non-Stacks addresses (this app is Stacks-only)
+      if (!isValidStacksAddress(address)) {
+        console.error("[wallet/storage] Attempted to save non-Stacks address (this app requires STX), ignoring:", address);
         return;
       }
       storage.setItem(WALLET_ADDRESS_KEY, address);
