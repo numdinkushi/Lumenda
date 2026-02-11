@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { WalletProvider } from "@/contexts/wallet-context";
+import { ConvexProviderWrapper } from "@/contexts/convex-provider";
 import { BackgroundByRoute } from "@/components/layout/background-by-route";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -30,13 +31,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <WalletProvider>
-          <div className="relative min-h-screen">
-            <BackgroundByRoute />
-            <div className="relative z-10">{children}</div>
-          </div>
-          <Toaster />
-        </WalletProvider>
+        <ConvexProviderWrapper>
+          <WalletProvider>
+            <div className="relative min-h-screen">
+              <BackgroundByRoute />
+              <div className="relative z-10">{children}</div>
+            </div>
+            <Toaster />
+          </WalletProvider>
+        </ConvexProviderWrapper>
       </body>
     </html>
   );

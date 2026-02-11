@@ -27,6 +27,8 @@ import {
   stxToMicroStx,
 } from "@/lib/stx";
 import { toast } from "sonner";
+import { useCreateTransaction } from "@/lib/convex/utils";
+import { isConvexConfigured } from "@/lib/convex/client";
 
 export default function SendPage() {
   const { address } = useWallet();
@@ -36,6 +38,7 @@ export default function SendPage() {
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
   const [sending, setSending] = useState(false);
+  const createTransaction = useCreateTransaction();
 
   // Load paused status on mount
   useState(() => {
@@ -73,10 +76,34 @@ export default function SendPage() {
     try {
       const params = buildInitiateTransferParams(recipient.trim(), amountMicro);
       const txId = await executeContractCall(params);
-      if (txId) {
+      
+      if (txId && address) {
         const { network, explorerUrl } = getContractAddresses();
         const chainParam = network === "testnet" ? "?chain=testnet" : "";
         const fullExplorerUrl = `${explorerUrl}/txid/${txId}${chainParam}`;
+        
+        // Track transaction in Convex immediately (transferId will be 0 until we know it)
+        if (isConvexConfigured()) {
+          try {
+            await createTransaction(
+              txId,
+              0, // Placeholder transferId - will be updated when transaction confirms
+              "initiate",
+              address,
+              "pending", // Will be updated when we check transaction status
+              {
+                amount: amountMicro.toString(),
+                fee: feeMicro.toString(),
+                recipient: recipient.trim(),
+                sender: address,
+              }
+            );
+          } catch (convexErr) {
+            // Don't fail the transaction if Convex tracking fails
+            console.error("Failed to track transaction in Convex:", convexErr);
+          }
+        }
+        
         toast.success(
           <div className="space-y-1">
             <p>Transaction submitted</p>
