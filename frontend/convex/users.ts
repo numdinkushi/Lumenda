@@ -109,3 +109,94 @@ export const updateUserStats = mutation({
     });
   },
 });
+
+/**
+ * Recalculate user statistics from transactions table.
+ * Calculates stats from successful transactions:
+ * - Sent: successful "initiate" transactions where user is sender
+ * - Received: successful "complete" transactions where user is recipient
+ */
+export const recalculateUserStats = mutation({
+  args: {
+    address: v.string(),
+    network: v.union(v.literal("testnet"), v.literal("mainnet")),
+  },
+  handler: async (ctx, args) => {
+    // Get all successful "initiate" transactions where user is the sender
+    const sentTransactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_user_address", (q) => q.eq("userAddress", args.address))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("transactionType"), "initiate"),
+          q.eq(q.field("status"), "success"),
+          q.eq(q.field("network"), args.network)
+        )
+      )
+      .collect();
+
+    // Get all successful "complete" transactions where user is the recipient
+    // For "complete" transactions, userAddress is the recipient (the one who completed it)
+    const receivedTransactions = await ctx.db
+      .query("transactions")
+      .withIndex("by_user_address", (q) => q.eq("userAddress", args.address))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("transactionType"), "complete"),
+          q.eq(q.field("status"), "success"),
+          q.eq(q.field("network"), args.network)
+        )
+      )
+      .collect();
+
+    // Calculate totals from transactions
+    let totalAmountSent = BigInt(0);
+    let totalAmountReceived = BigInt(0);
+
+    for (const tx of sentTransactions) {
+      if (tx.metadata?.amount) {
+        totalAmountSent += BigInt(tx.metadata.amount);
+      }
+    }
+
+    for (const tx of receivedTransactions) {
+      if (tx.metadata?.amount) {
+        totalAmountReceived += BigInt(tx.metadata.amount);
+      }
+    }
+
+    // Get or create user
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_address_and_network", (q) =>
+        q.eq("address", args.address).eq("network", args.network)
+      )
+      .first();
+
+    const now = Math.floor(Date.now() / 1000);
+
+    if (user) {
+      // Update existing user
+      await ctx.db.patch(user._id, {
+        totalTransfersSent: sentTransactions.length,
+        totalTransfersReceived: receivedTransactions.length,
+        totalAmountSent: totalAmountSent.toString(),
+        totalAmountReceived: totalAmountReceived.toString(),
+        lastActiveAt: now,
+      });
+      return user._id;
+    } else {
+      // Create new user
+      return await ctx.db.insert("users", {
+        address: args.address,
+        network: args.network,
+        firstSeenAt: now,
+        lastActiveAt: now,
+        totalTransfersSent: sentTransactions.length,
+        totalTransfersReceived: receivedTransactions.length,
+        totalAmountSent: totalAmountSent.toString(),
+        totalAmountReceived: totalAmountReceived.toString(),
+      });
+    }
+  },
+});

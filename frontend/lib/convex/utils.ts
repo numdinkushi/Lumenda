@@ -134,16 +134,17 @@ export function useSyncTransfer() {
     createdAt: number;
     completedAt?: number;
     cancelledAt?: number;
-  }): Promise<Id<"transfers"> | null> => {
+  }): Promise<{ _id: Id<"transfers">; wasNew: boolean; statusChanged: boolean; previousStatus?: "pending" | "completed" | "cancelled" } | null> => {
     if (!isConfigured) {
       // Convex not configured, skip
       return null;
     }
-    return await upsertTransferMutation({
+    const result = await upsertTransferMutation({
       ...transfer,
       network,
       contractAddress,
     } as UpsertTransferArgs);
+    return result as { _id: Id<"transfers">; wasNew: boolean; statusChanged: boolean; previousStatus?: "pending" | "completed" | "cancelled" };
   };
 }
 
@@ -192,5 +193,26 @@ export function useUpdateUserStats() {
       isSender,
       amount,
     } as UpdateUserStatsArgs);
+  };
+}
+
+/**
+ * Recalculate user statistics from transactions table.
+ * This recalculates stats from scratch, useful for fixing inconsistencies.
+ */
+export function useRecalculateUserStats() {
+  // Always call useMutation unconditionally (React rules)
+  const recalculateMutation = useMutation(api.users.recalculateUserStats);
+  const { network } = getConvexNetworkInfo();
+  const isConfigured = isConvexConfigured();
+
+  return async (address: string): Promise<Id<"users"> | null> => {
+    if (!isConfigured) {
+      return null;
+    }
+    return await recalculateMutation({
+      address,
+      network,
+    });
   };
 }

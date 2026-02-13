@@ -38,10 +38,13 @@ export const upsertTransfer = mutation({
       .first();
 
     const now = Math.floor(Date.now() / 1000);
+    const wasNew = !existing;
+    const statusChanged = existing && existing.status !== args.status;
+    const previousStatus = existing?.status;
 
     if (existing) {
       // Update existing transfer
-      return await ctx.db.patch(existing._id, {
+      await ctx.db.patch(existing._id, {
         sender: args.sender,
         recipient: args.recipient,
         amount: args.amount,
@@ -52,10 +55,11 @@ export const upsertTransfer = mutation({
         cancelledAt: args.cancelledAt,
         lastSyncedAt: now,
       });
+      return { _id: existing._id, wasNew: false, statusChanged, previousStatus };
     }
 
     // Create new transfer
-    return await ctx.db.insert("transfers", {
+    const _id = await ctx.db.insert("transfers", {
       transferId: args.transferId,
       sender: args.sender,
       recipient: args.recipient,
@@ -70,6 +74,7 @@ export const upsertTransfer = mutation({
       contractAddress: args.contractAddress,
       lastSyncedAt: now,
     });
+    return { _id, wasNew: true, statusChanged: false, previousStatus: undefined };
   },
 });
 

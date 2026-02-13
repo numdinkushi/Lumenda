@@ -72,3 +72,20 @@ export function useUpdateUserStats() {
     return await updateUserStatsMutation({ address, network, isSender, amount } as UpdateUserStatsArgs);
   };
 }
+
+/**
+ * Recalculate user statistics from transactions table.
+ */
+export function useRecalculateUserStats() {
+  // Always call useMutation unconditionally (React rules)
+  const recalculateMutation = useMutation(api.users.recalculateUserStats);
+  const { network } = getConvexNetworkInfo();
+  const isConfigured = isConvexConfigured();
+
+  return async (address: string): Promise<Id<"users"> | null> => {
+    if (!isConfigured) {
+      return null;
+    }
+    return await recalculateMutation({ address, network });
+  };
+}
