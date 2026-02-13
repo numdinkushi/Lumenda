@@ -26,7 +26,13 @@ export function getConvexNetworkInfo() {
  * Call this immediately after a transaction is submitted to track it.
  */
 export function useCreateTransaction() {
-  const createTransaction = useMutation(api.transactions.createTransaction);
+  let createTransaction: ((args: any) => Promise<any>) | null = null;
+  try {
+    createTransaction = useMutation(api.transactions.createTransaction);
+  } catch {
+    // Convex not configured or provider not available
+    createTransaction = null;
+  }
   const { network, contractAddress, contractName } = getConvexNetworkInfo();
 
   return async (
@@ -42,6 +48,10 @@ export function useCreateTransaction() {
       sender?: string;
     }
   ) => {
+    if (!createTransaction) {
+      // Convex not configured, skip
+      return null;
+    }
     const timestamp = Math.floor(Date.now() / 1000);
 
     return await createTransaction({
@@ -64,7 +74,13 @@ export function useCreateTransaction() {
  * Call this to cache transfer data for faster access.
  */
 export function useSyncTransfer() {
-  const upsertTransfer = useMutation(api.transfers.upsertTransfer);
+  let upsertTransfer: ((args: any) => Promise<any>) | null = null;
+  try {
+    upsertTransfer = useMutation(api.transfers.upsertTransfer);
+  } catch {
+    // Convex not configured or provider not available
+    upsertTransfer = null;
+  }
   const { network, contractAddress } = getConvexNetworkInfo();
 
   return async (transfer: {
@@ -79,6 +95,10 @@ export function useSyncTransfer() {
     completedAt?: number;
     cancelledAt?: number;
   }) => {
+    if (!upsertTransfer) {
+      // Convex not configured, skip
+      return null;
+    }
     return await upsertTransfer({
       ...transfer,
       network,
@@ -91,10 +111,20 @@ export function useSyncTransfer() {
  * Get or create user record in Convex.
  */
 export function useGetOrCreateUser() {
-  const getOrCreateUser = useMutation(api.users.getOrCreateUser);
+  let getOrCreateUser: ((args: any) => Promise<any>) | null = null;
+  try {
+    getOrCreateUser = useMutation(api.users.getOrCreateUser);
+  } catch {
+    // Convex not configured or provider not available
+    getOrCreateUser = null;
+  }
   const { network } = getConvexNetworkInfo();
 
   return async (address: string) => {
+    if (!getOrCreateUser) {
+      // Convex not configured, skip
+      return null;
+    }
     return await getOrCreateUser({
       address,
       network,
@@ -106,7 +136,13 @@ export function useGetOrCreateUser() {
  * Update user statistics when a transfer occurs.
  */
 export function useUpdateUserStats() {
-  const updateUserStats = useMutation(api.users.updateUserStats);
+  let updateUserStats: ((args: any) => Promise<any>) | null = null;
+  try {
+    updateUserStats = useMutation(api.users.updateUserStats);
+  } catch {
+    // Convex not configured or provider not available
+    updateUserStats = null;
+  }
   const { network } = getConvexNetworkInfo();
 
   return async (
@@ -114,6 +150,10 @@ export function useUpdateUserStats() {
     isSender: boolean,
     amount: string
   ) => {
+    if (!updateUserStats) {
+      // Convex not configured, skip
+      return null;
+    }
     return await updateUserStats({
       address,
       network,

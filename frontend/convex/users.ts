@@ -83,8 +83,18 @@ export const updateUserStats = mutation({
       .first();
 
     if (!user) {
-      // User should exist, but create if not
-      await getOrCreateUser(ctx, { address: args.address, network: args.network });
+      // User should exist, but create if not - inline the logic since we can't call mutations from mutations
+      const now = Math.floor(Date.now() / 1000);
+      await ctx.db.insert("users", {
+        address: args.address,
+        network: args.network,
+        firstSeenAt: now,
+        lastActiveAt: now,
+        totalTransfersSent: 0,
+        totalTransfersReceived: 0,
+        totalAmountSent: "0",
+        totalAmountReceived: "0",
+      });
       return;
     }
 

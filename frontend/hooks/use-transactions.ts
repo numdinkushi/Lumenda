@@ -5,27 +5,33 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { getConvexNetworkInfo } from "@/lib/convex/utils";
-import { Id } from "@/convex/_generated/dataModel";
 
 /**
  * Get transaction by transaction ID.
  */
 export function useTransaction(txId: string | null) {
-  return useQuery(
-    api.transactions.getTransactionByTxId,
-    txId ? { txId } : "skip"
-  );
+  try {
+    return useQuery(
+      api.transactions.getTransactionByTxId,
+      txId ? { txId } : "skip"
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 /**
  * Get all transactions for a specific transfer.
  */
 export function useTransferTransactions(transferId: number | null) {
-  return useQuery(
-    api.transactions.getTransactionsByTransferId,
-    transferId !== null ? { transferId } : "skip"
-  );
+  try {
+    return useQuery(
+      api.transactions.getTransactionsByTransferId,
+      transferId !== null ? { transferId } : "skip"
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -35,12 +41,16 @@ export function useTransferTransaction(
   transferId: number | null,
   transactionType: "initiate" | "complete" | "cancel"
 ) {
-  return useQuery(
-    api.transactions.getTransactionByTransferAndType,
-    transferId !== null
-      ? { transferId, transactionType }
-      : "skip"
-  );
+  try {
+    return useQuery(
+      api.transactions.getTransactionByTransferAndType,
+      transferId !== null
+        ? { transferId, transactionType }
+        : "skip"
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -51,19 +61,27 @@ export function useUserTransactions(
   transactionType?: "initiate" | "complete" | "cancel",
   limit?: number
 ) {
-  return useQuery(
-    api.transactions.getTransactionsByUser,
-    userAddress
-      ? { userAddress, transactionType, limit }
-      : "skip"
-  );
+  try {
+    return useQuery(
+      api.transactions.getTransactionsByUser,
+      userAddress
+        ? { userAddress, transactionType, limit }
+        : "skip"
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 /**
  * Update transaction status (e.g., when a pending transaction confirms).
  */
 export function useUpdateTransactionStatus() {
-  return useMutation(api.transactions.updateTransactionStatus);
+  try {
+    return useMutation(api.transactions.updateTransactionStatus);
+  } catch {
+    return () => Promise.resolve();
+  }
 }
 
 /**

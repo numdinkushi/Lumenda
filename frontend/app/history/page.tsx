@@ -1,5 +1,8 @@
 "use client";
 
+// Skip prerendering since this page requires client-side Convex hooks
+export const dynamic = "force-dynamic";
+
 import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout";

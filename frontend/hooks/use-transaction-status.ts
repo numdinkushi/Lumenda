@@ -7,18 +7,23 @@ import { useEffect, useCallback, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { fetchTransactionStatus } from "@/lib/utils/transaction-status";
-import { toast } from "sonner";
 
 /**
- * Hook to check and update a single transaction status.
+ * Hook to check and update a single transaction status from blockchain.
  */
-export function useUpdateTransactionStatus() {
-  const updateStatus = useMutation(api.transactions.updateTransactionStatus);
+export function useCheckAndUpdateTransactionStatus() {
+  let updateStatus: ((args: any) => Promise<any>) | null = null;
+  try {
+    updateStatus = useMutation(api.transactions.updateTransactionStatus);
+  } catch {
+    // Convex not configured or provider not available
+    updateStatus = null;
+  }
   const [isUpdating, setIsUpdating] = useState(false);
 
   const checkAndUpdate = useCallback(
     async (txId: string) => {
-      if (isUpdating) return;
+      if (isUpdating || !updateStatus) return;
       
       setIsUpdating(true);
       try {
@@ -50,7 +55,7 @@ export function useUpdateTransactionStatus() {
  * Useful for pending transactions that need status updates.
  */
 export function usePollTransactionStatus(txId: string | null, enabled = true) {
-  const { checkAndUpdate } = useUpdateTransactionStatus();
+  const { checkAndUpdate } = useCheckAndUpdateTransactionStatus();
   const [lastStatus, setLastStatus] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,12 +90,18 @@ export function usePollTransactionStatus(txId: string | null, enabled = true) {
  * Hook to check and update multiple pending transactions.
  */
 export function useUpdatePendingTransactions() {
-  const updateStatus = useMutation(api.transactions.updateTransactionStatus);
+  let updateStatus: ((args: any) => Promise<any>) | null = null;
+  try {
+    updateStatus = useMutation(api.transactions.updateTransactionStatus);
+  } catch {
+    // Convex not configured or provider not available
+    updateStatus = null;
+  }
   const [isUpdating, setIsUpdating] = useState(false);
 
   const updatePending = useCallback(
     async (txIds: string[]) => {
-      if (isUpdating || txIds.length === 0) return;
+      if (isUpdating || txIds.length === 0 || !updateStatus) return [];
       
       setIsUpdating(true);
       try {

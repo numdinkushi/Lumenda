@@ -10,10 +10,14 @@ import { api } from "@/convex/_generated/api";
  * Get transfer by transfer ID.
  */
 export function useTransfer(transferId: number | null) {
-  return useQuery(
-    api.transfers.getTransfer,
-    transferId !== null ? { transferId } : "skip"
-  );
+  try {
+    return useQuery(
+      api.transfers.getTransfer,
+      transferId !== null ? { transferId } : "skip"
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -24,20 +28,28 @@ export function useUserTransfers(
   status?: "pending" | "completed" | "cancelled",
   limit?: number
 ) {
-  return useQuery(
-    api.transfers.getTransfersByUser,
-    userAddress ? { userAddress, status, limit } : "skip"
-  );
+  try {
+    return useQuery(
+      api.transfers.getTransfersByUser,
+      userAddress ? { userAddress, status, limit } : "skip"
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 /**
  * Get pending transfers for a user (as recipient).
  */
 export function usePendingTransfers(userAddress: string | null) {
-  return useQuery(
-    api.transfers.getPendingTransfersForUser,
-    userAddress ? { userAddress } : "skip"
-  );
+  try {
+    return useQuery(
+      api.transfers.getPendingTransfersForUser,
+      userAddress ? { userAddress } : "skip"
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -47,12 +59,20 @@ export function useTransfersByStatus(
   status: "pending" | "completed" | "cancelled",
   limit?: number
 ) {
-  return useQuery(api.transfers.getTransfersByStatus, { status, limit });
+  try {
+    return useQuery(api.transfers.getTransfersByStatus, { status, limit });
+  } catch {
+    return undefined;
+  }
 }
 
 /**
  * Sync transfer from contract to Convex.
  */
 export function useSyncTransfer() {
-  return useMutation(api.transfers.upsertTransfer);
+  try {
+    return useMutation(api.transfers.upsertTransfer);
+  } catch {
+    return () => Promise.resolve(null);
+  }
 }
