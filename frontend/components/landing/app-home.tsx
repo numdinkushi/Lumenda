@@ -16,7 +16,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Send, ArrowRightLeft, History, Shield, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useWallet } from "@/contexts/wallet-context";
 import { useRemittance } from "@/hooks/use-remittance";
+import { useWalletBalance } from "@/hooks/use-wallet-balance";
+import { useUserTransfers } from "@/hooks/use-transfers";
 import { formatStx } from "@/lib/stx";
+import { truncateAddress } from "@/lib/utils/address";
+import { Copy, ExternalLink } from "lucide-react";
+import { toast } from "sonner";
 import type { Transfer } from "@/lib/contracts";
 
 /**
@@ -26,6 +31,8 @@ import type { Transfer } from "@/lib/contracts";
 export function AppHome() {
   const { address } = useWallet();
   const { loadTransfer, loadTransferCount } = useRemittance();
+  const { balance, balanceFormatted, usdValueFormatted, loading: balanceLoading } = useWalletBalance(address);
+  const recentTransfers = useUserTransfers(address, undefined, 5); // Get latest 5 transfers
   const [pendingTransfers, setPendingTransfers] = useState<Transfer[]>([]);
   const [loadingPending, setLoadingPending] = useState(true);
 
@@ -115,6 +122,59 @@ export function AppHome() {
         <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
           Fast, secure remittance. Choose an action below.
         </p>
+        
+        {/* Wallet Balance Display */}
+        {address && (
+          <div className="mt-8 flex items-center justify-center">
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 max-w-md w-full">
+              <CardContent className="pt-6 pb-6">
+                <div className="flex flex-col items-center space-y-2">
+                  <p className="text-sm text-muted-foreground">Wallet Balance</p>
+                  <div className="flex flex-col items-center gap-1">
+                    {balanceLoading ? (
+                      <>
+                        <div className="h-8 w-32 animate-pulse bg-muted rounded mb-1" />
+                        <div className="h-5 w-20 animate-pulse bg-muted rounded" />
+                      </>
+                    ) : balanceFormatted ? (
+                      <>
+                        <p className="text-3xl font-bold text-foreground">
+                          {balanceFormatted} <span className="text-lg text-muted-foreground">STX</span>
+                        </p>
+                        {usdValueFormatted && (
+                          <p className="text-lg text-muted-foreground">
+                            {usdValueFormatted}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-3xl font-bold text-muted-foreground">-- STX</p>
+                        <p className="text-lg text-muted-foreground">--</p>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <p className="text-xs text-muted-foreground font-mono">
+                      {truncateAddress(address)}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(address);
+                        toast.success("Address copied to clipboard");
+                      }}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </section>
 
       <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto">
@@ -149,12 +209,58 @@ export function AppHome() {
             <CardDescription>Your latest activity</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              No transfers yet. Send your first transfer.
-            </div>
-            <Button asChild variant="outline" size="sm" className="mt-3 w-full">
-              <Link href="/history">View history</Link>
-            </Button>
+            {recentTransfers && recentTransfers.length > 0 ? (
+              <div className="space-y-3">
+                {recentTransfers.slice(0, 5).map((transfer) => {
+                  const isSent = transfer.sender === address;
+                  const isPending = transfer.status === "pending";
+                  const isCompleted = transfer.status === "completed";
+                  
+                  return (
+                    <div
+                      key={transfer.transferId}
+                      className="rounded-lg border border-border bg-background/50 p-3 space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`h-2 w-2 rounded-full ${
+                            isPending ? "bg-yellow-500" : isCompleted ? "bg-green-500" : "bg-gray-500"
+                          }`} />
+                          <span className="text-sm font-medium">
+                            {isSent ? "Sent" : "Received"}
+                          </span>
+                        </div>
+                        <Badge variant={isPending ? "secondary" : isCompleted ? "default" : "outline"}>
+                          {transfer.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          {isSent ? "To" : "From"}: {truncateAddress(isSent ? transfer.recipient : transfer.sender)}
+                        </span>
+                        <span className="font-semibold">
+                          {formatStx(BigInt(transfer.amount))} STX
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+                <Button asChild variant="outline" size="sm" className="w-full mt-2">
+                  <Link href="/history">
+                    View all transfers <ExternalLink className="ml-2 h-3 w-3" />
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                  No transfers yet. Send your first transfer.
+                </div>
+                <Button asChild variant="outline" size="sm" className="mt-3 w-full">
+                  <Link href="/history">View history</Link>
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       </section>

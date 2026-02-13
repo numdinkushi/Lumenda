@@ -101,8 +101,8 @@ export default function HistoryPage() {
           amount: ct.amount,
           fee: ct.fee,
           createdAt: ct.createdAt,
-          completedAt: ct.completedAt || undefined,
-          cancelledAt: ct.cancelledAt || undefined,
+          completedAt: ct.completedAt ?? null,
+          cancelledAt: ct.cancelledAt ?? null,
           status: ct.status,
         }));
         formattedTransfers.sort((a, b) => b.createdAt - a.createdAt);

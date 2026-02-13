@@ -14,6 +14,7 @@ import { useWallet } from "@/contexts/wallet-context";
 import { cn } from "@/lib/utils";
 
 const navItems = [
+  { label: "Dashboard", href: "/dashboard" },
   { label: "Send", href: "/send" },
   { label: "History", href: "/history" },
   { label: "Fees", href: "/fees" },
