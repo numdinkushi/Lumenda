@@ -37,7 +37,7 @@ export function AppHome() {
 
   useEffect(() => {
     if (!address) {
-      setPendingTransfers([]);
+      // State is already initialized to [], no need to set it synchronously
       return;
     }
 
@@ -49,7 +49,9 @@ export function AppHome() {
         if (cancelled) return;
         
         if (count === null || count === 0) {
-          if (!cancelled) setPendingTransfers([]);
+          if (!cancelled) {
+            setPendingTransfers([]);
+          }
           return;
         }
         const list: Transfer[] = [];
@@ -83,6 +85,17 @@ export function AppHome() {
       cancelled = true;
     };
   }, [address, loadTransfer, loadTransferCount]);
+
+  // Reset pending transfers when address becomes null (in a separate effect to avoid synchronous setState)
+  useEffect(() => {
+    if (!address && pendingTransfers.length > 0) {
+      // Use setTimeout to defer setState call
+      const timer = setTimeout(() => {
+        setPendingTransfers([]);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [address, pendingTransfers.length]);
 
   return (
     <>
