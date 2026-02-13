@@ -22,7 +22,7 @@ export function TransactionLink({ txId, explorerUrl, className }: TransactionLin
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    const success = await copyToClipboard(
+    await copyToClipboard(
       txId,
       () => {
         setCopied(true);

@@ -55,7 +55,7 @@ export const upsertTransfer = mutation({
         cancelledAt: args.cancelledAt,
         lastSyncedAt: now,
       });
-      return { _id: existing._id, wasNew: false, statusChanged, previousStatus };
+      return { _id: existing._id, wasNew: false, statusChanged: statusChanged ?? false, previousStatus };
     }
 
     // Create new transfer

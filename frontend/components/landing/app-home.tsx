@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Send, ArrowRightLeft, History, Shield, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Send, ArrowRightLeft, History, Shield, AlertCircle } from "lucide-react";
 import { useWallet } from "@/contexts/wallet-context";
 import { useRemittance } from "@/hooks/use-remittance";
 import { useWalletBalance } from "@/hooks/use-wallet-balance";
@@ -31,18 +31,15 @@ import type { Transfer } from "@/lib/contracts";
 export function AppHome() {
   const { address } = useWallet();
   const { loadTransfer, loadTransferCount } = useRemittance();
-  const { balance, balanceFormatted, usdValueFormatted, loading: balanceLoading } = useWalletBalance(address);
+  const { balanceFormatted, usdValueFormatted, loading: balanceLoading } = useWalletBalance(address);
   const recentTransfers = useUserTransfers(address, undefined, 5); // Get latest 5 transfers
   const [pendingTransfers, setPendingTransfers] = useState<Transfer[]>([]);
-  const [loadingPending, setLoadingPending] = useState(true);
 
   const loadPendingTransfers = useCallback(async () => {
     if (!address) {
       setPendingTransfers([]);
-      setLoadingPending(false);
       return;
     }
-    setLoadingPending(true);
     try {
       const count = await loadTransferCount();
       if (count === null || count === 0) {
@@ -66,8 +63,6 @@ export function AppHome() {
     } catch (e) {
       console.error("Failed to load pending transfers:", e);
       setPendingTransfers([]);
-    } finally {
-      setLoadingPending(false);
     }
   }, [address, loadTransfer, loadTransferCount]);
 

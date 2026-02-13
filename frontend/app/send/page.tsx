@@ -121,7 +121,7 @@ export default function SendPage() {
             <div className="text-xs text-muted-foreground space-y-1 border-t border-border/50 pt-2 mt-2">
               <p className="font-semibold text-yellow-400">⚠️ Important: Funds are in escrow</p>
               <p>The recipient ({recipient.trim().slice(0, 8)}...) must connect their wallet and complete the transfer to receive the funds.</p>
-              <p>They can do this by going to the History page and clicking "Complete" on the pending transfer.</p>
+              <p>They can do this by going to the History page and clicking &quot;Complete&quot; on the pending transfer.</p>
             </div>
             <p className="text-xs text-muted-foreground">
               Check your Leather wallet to approve. Transaction may take 1-2 minutes to confirm.

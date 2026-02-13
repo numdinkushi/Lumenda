@@ -3,7 +3,7 @@
 // Skip prerendering since this page requires client-side Convex hooks
 export const dynamic = "force-dynamic";
 
-import { useCallback, useEffect, useState, useRef, useMemo } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout";
 import { RequireWallet } from "@/components/auth/require-wallet";
@@ -44,7 +44,6 @@ export default function HistoryPage() {
   const [actingId, setActingId] = useState<number | null>(null);
   const createTransaction = useCreateTransaction();
   const syncTransfer = useSyncTransfer();
-  const updateUserStats = useUpdateUserStats();
   const recalculateUserStats = useRecalculateUserStats();
   const { updatePending } = useUpdatePendingTransactions();
 
@@ -388,17 +387,6 @@ export default function HistoryPage() {
     }
   };
 
-  // Refresh function to manually reload transfers (for refresh button and after complete/cancel)
-  const refreshTransfers = useCallback(() => {
-    // Force re-evaluation by updating a dependency
-    // The useEffect will automatically reload when convexTransfers changes or address changes
-    // For manual refresh, we can trigger by syncing a specific transfer or just let Convex auto-update
-    if (convexTransfers) {
-      // Convex will auto-update, but we can also force a contract sync for latest data
-      // For now, just rely on Convex auto-updates
-      console.log("[HistoryPage] Refresh requested - Convex will auto-update");
-    }
-  }, [convexTransfers]);
 
   // Recalculate user stats from transactions table after transfers are loaded
   // This ensures stats are always accurate, even if transfer syncing had issues
@@ -474,7 +462,7 @@ export default function HistoryPage() {
                       <div className="mt-3 p-3 rounded-lg border border-yellow-500/50 bg-yellow-500/10 text-sm">
                         <p className="text-yellow-400 font-semibold mb-1">⚠️ Pending transfers waiting for completion</p>
                         <p className="text-muted-foreground text-xs">
-                          Funds are held in escrow. Click "Complete" on pending transfers where you are the recipient to receive the funds.
+                          Funds are held in escrow. Click &quot;Complete&quot; on pending transfers where you are the recipient to receive the funds.
                         </p>
                       </div>
                     )}
@@ -595,7 +583,7 @@ export default function HistoryPage() {
                                     </p>
                                     {t.status === "pending" && isRecipient && (
                                       <p className="text-xs text-yellow-400 mt-1 font-medium">
-                                        💰 Funds are in escrow - Click "Complete" to receive them
+                                        💰 Funds are in escrow - Click &quot;Complete&quot; to receive them
                                       </p>
                                     )}
                                     {t.status === "pending" && isSender && (

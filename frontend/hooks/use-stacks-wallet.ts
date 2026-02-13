@@ -104,7 +104,7 @@ export function useStacksWallet(): UseStacksWalletResult {
     };
 
     void restoreAddress();
-  }, []);
+  }, [getOrCreateUser]);
 
   const connect = useCallback(async () => {
     setConnectError(null);
