@@ -29,10 +29,11 @@ import { formatStx } from "@/lib/stx";
 import { toast } from "sonner";
 import { ExternalLink } from "lucide-react";
 import { useUserTransactions } from "@/hooks/use-transactions";
-import { useCreateTransaction } from "@/lib/convex/utils";
+import { useCreateTransaction, useSyncTransfer, useRecalculateUserStats } from "@/lib/convex/utils";
 import { isConvexConfigured } from "@/lib/convex/client";
 import { TransactionsTable, type TransactionRow } from "@/components/history/transactions-table";
 import { useUpdatePendingTransactions } from "@/hooks/use-transaction-status";
+import { useUserTransfers } from "@/hooks/use-transfers";
 
 export default function HistoryPage() {
   const { address } = useWallet();
@@ -42,10 +43,15 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState<number | null>(null);
   const createTransaction = useCreateTransaction();
+  const syncTransfer = useSyncTransfer();
+  const recalculateUserStats = useRecalculateUserStats();
   const { updatePending } = useUpdatePendingTransactions();
 
   // Get all transactions for this user from Convex
   const userTransactions = useUserTransactions(address, undefined, 200);
+  
+  // Get transfers from Convex first (much faster than contract calls)
+  const convexTransfers = useUserTransfers(address, undefined, 200);
 
   // Update pending transactions when page loads or userTransactions changes
   useEffect(() => {
@@ -63,53 +69,139 @@ export default function HistoryPage() {
     }
   }, [userTransactions, updatePending]);
 
-  const loadTransfers = useCallback(async () => {
+  // Use Convex transfers as primary source (fast), fallback to contract if needed
+  // Use ref to track previous transfers and prevent infinite loops
+  const previousTransfersRef = useRef<string>("");
+  
+  useEffect(() => {
     if (!address) {
       setTransfers([]);
       setLoading(false);
+      previousTransfersRef.current = "";
       return;
     }
-    setLoading(true);
-    try {
-      const count = await loadTransferCount();
-      if (count === null) {
-        console.warn("Failed to get transfer count");
+
+    // If Convex has transfers, use them (much faster)
+    if (convexTransfers && convexTransfers.length > 0) {
+      // Create a stable key from transfer IDs to detect actual changes
+      const transfersKey = convexTransfers
+        .map((ct) => `${ct.transferId}-${ct.status}-${ct.createdAt}`)
+        .join(",");
+      
+      // Only update if transfers actually changed
+      if (previousTransfersRef.current !== transfersKey) {
+        previousTransfersRef.current = transfersKey;
+        
+        // Convert Convex transfers to Transfer format
+        const formattedTransfers: Transfer[] = convexTransfers.map((ct) => ({
+          id: ct.transferId,
+          sender: ct.sender,
+          recipient: ct.recipient,
+          amount: ct.amount,
+          fee: ct.fee,
+          createdAt: ct.createdAt,
+          completedAt: ct.completedAt ?? null,
+          cancelledAt: ct.cancelledAt ?? null,
+          status: ct.status,
+        }));
+        formattedTransfers.sort((a, b) => b.createdAt - a.createdAt);
+        setTransfers(formattedTransfers);
+        setLoading(false);
+      }
+    } else if (convexTransfers && convexTransfers.length === 0) {
+      // Empty array - clear transfers
+      if (previousTransfersRef.current !== "empty") {
+        previousTransfersRef.current = "empty";
         setTransfers([]);
-        return;
+        setLoading(false);
       }
-      if (count === 0) {
-        setTransfers([]);
-        return;
-      }
-      const list: Transfer[] = [];
-      for (let id = 1; id <= count; id++) {
-        try {
-          const t = await loadTransfer(id);
-          if (t && (t.sender === address || t.recipient === address)) {
-            list.push(t);
-          }
-        } catch (e) {
-          // Skip individual transfer errors, continue loading others
-          console.warn(`Failed to load transfer ${id}:`, e);
-        }
-      }
-      list.sort((a, b) => b.createdAt - a.createdAt);
-      setTransfers(list);
-    } catch (e) {
-      console.error("Failed to load transfers:", e);
-      toast.error("Failed to load transfers. Check console for details.");
-      setTransfers([]);
-    } finally {
-      setLoading(false);
     }
-  }, [address, loadTransfer, loadTransferCount]);
+  }, [address, convexTransfers]);
+
+  // Background sync: Only sync missing transfers if Convex is empty
+  // This runs in the background and doesn't block the UI
+  const hasSyncedRef = useRef<string | null>(null);
+  const convexTransfersLength = convexTransfers?.length ?? 0;
+  
+  useEffect(() => {
+    if (!address || !isConvexConfigured()) {
+      return;
+    }
+
+    // Only sync once per address, and only if Convex has no transfers
+    // Transfers will be synced automatically when transactions occur (initiate/complete/cancel)
+    if (convexTransfersLength === 0 && hasSyncedRef.current !== address) {
+      hasSyncedRef.current = address;
+      
+      // Background sync: Load only recent transfers (non-blocking)
+      const backgroundSync = async () => {
+        try {
+          const count = await loadTransferCount();
+          if (!count || count === 0) {
+            return;
+          }
+
+          // Only sync the most recent 10 transfers in background
+          // This prevents excessive API calls while still populating Convex
+          const maxSync = 10;
+          const startId = Math.max(1, count - maxSync + 1);
+          
+          // Load in parallel but don't block UI
+          const transferPromises: Promise<Transfer | null>[] = [];
+          for (let id = startId; id <= count; id++) {
+            transferPromises.push(loadTransfer(id));
+          }
+          
+          const results = await Promise.all(transferPromises);
+          
+          // Sync to Convex in background
+          for (const t of results) {
+            if (t && (t.sender === address || t.recipient === address)) {
+              try {
+                const totalAmount = BigInt(t.amount) + BigInt(t.fee || "0");
+                await syncTransfer({
+                  transferId: t.id,
+                  sender: t.sender,
+                  recipient: t.recipient,
+                  amount: t.amount,
+                  fee: t.fee || "0",
+                  totalAmount: totalAmount.toString(),
+                  status: t.status as "pending" | "completed" | "cancelled",
+                  createdAt: t.createdAt,
+                  completedAt: t.completedAt || undefined,
+                  cancelledAt: t.cancelledAt || undefined,
+                });
+              } catch (syncErr) {
+                console.warn(`Background sync failed for transfer ${t.id}:`, syncErr);
+              }
+            }
+          }
+    } catch (e) {
+          console.warn("Background sync failed:", e);
+          // Don't show error to user - this is background operation
+        }
+      };
+
+      // Run in background without blocking
+      void backgroundSync();
+    }
+  }, [address, convexTransfersLength, loadTransfer, loadTransferCount, syncTransfer]);
 
   const onComplete = async (t: Transfer) => {
     if (t.status !== "pending" || t.recipient !== address || !address) return;
     setActingId(t.id);
+    
+    // Add a safety timeout to ensure actingId is reset even if something hangs
+    const safetyTimeout = setTimeout(() => {
+      console.warn("Complete transfer operation timed out, resetting state");
+      setActingId(null);
+    }, 6 * 60 * 1000); // 6 minutes (slightly longer than requestContractCall timeout)
+    
     try {
       const params = buildCompleteTransferParams(t.id);
       const txId = await executeContractCall(params);
+      clearTimeout(safetyTimeout);
+      
       if (txId) {
         // Track transaction in Convex
         if (isConvexConfigured()) {
@@ -149,12 +241,48 @@ export default function HistoryPage() {
             </a>
           </div>
         );
-        await loadTransfers();
+        // Sync the updated transfer to Convex immediately
+        // This ensures Convex has the latest data without reloading from contract
+        if (isConvexConfigured()) {
+          try {
+            // Wait a bit for transaction to be indexed, then sync
+            setTimeout(async () => {
+              const updatedTransfer = await loadTransfer(t.id);
+              if (updatedTransfer) {
+                const totalAmount = BigInt(updatedTransfer.amount) + BigInt(updatedTransfer.fee || "0");
+                await syncTransfer({
+                  transferId: updatedTransfer.id,
+                  sender: updatedTransfer.sender,
+                  recipient: updatedTransfer.recipient,
+                  amount: updatedTransfer.amount,
+                  fee: updatedTransfer.fee || "0",
+                  totalAmount: totalAmount.toString(),
+                  status: updatedTransfer.status as "pending" | "completed" | "cancelled",
+                  createdAt: updatedTransfer.createdAt,
+                  completedAt: updatedTransfer.completedAt || undefined,
+                  cancelledAt: updatedTransfer.cancelledAt || undefined,
+                });
+              }
+            }, 2000);
+          } catch (syncErr) {
+            console.warn("Failed to sync updated transfer to Convex:", syncErr);
+          }
+        }
+        
+        // Reset loading state - Convex will auto-update via query
+        setActingId(null);
       }
     } catch (err) {
+      clearTimeout(safetyTimeout);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes("cancelled") || errMsg.includes("closed") || errMsg.includes("timeout")) {
+        toast.info("Transaction cancelled. You can try again by clicking Complete.");
+      } else {
       toast.error("Complete failed");
+      }
       console.error(err);
     } finally {
+      clearTimeout(safetyTimeout);
       setActingId(null);
     }
   };
@@ -162,9 +290,18 @@ export default function HistoryPage() {
   const onCancel = async (t: Transfer) => {
     if (t.status !== "pending" || t.sender !== address || !address) return;
     setActingId(t.id);
+    
+    // Add a safety timeout to ensure actingId is reset even if something hangs
+    const safetyTimeout = setTimeout(() => {
+      console.warn("Cancel transfer operation timed out, resetting state");
+      setActingId(null);
+    }, 6 * 60 * 1000); // 6 minutes (slightly longer than requestContractCall timeout)
+    
     try {
       const params = buildCancelTransferParams(t.id);
       const txId = await executeContractCall(params);
+      clearTimeout(safetyTimeout);
+      
       if (txId) {
         // Track transaction in Convex
         if (isConvexConfigured()) {
@@ -204,19 +341,71 @@ export default function HistoryPage() {
             </a>
           </div>
         );
-        await loadTransfers();
+        // Sync the updated transfer to Convex immediately
+        // This ensures Convex has the latest data without reloading from contract
+        if (isConvexConfigured()) {
+          try {
+            // Wait a bit for transaction to be indexed, then sync
+            setTimeout(async () => {
+              const updatedTransfer = await loadTransfer(t.id);
+              if (updatedTransfer) {
+                const totalAmount = BigInt(updatedTransfer.amount) + BigInt(updatedTransfer.fee || "0");
+                await syncTransfer({
+                  transferId: updatedTransfer.id,
+                  sender: updatedTransfer.sender,
+                  recipient: updatedTransfer.recipient,
+                  amount: updatedTransfer.amount,
+                  fee: updatedTransfer.fee || "0",
+                  totalAmount: totalAmount.toString(),
+                  status: updatedTransfer.status as "pending" | "completed" | "cancelled",
+                  createdAt: updatedTransfer.createdAt,
+                  completedAt: updatedTransfer.completedAt || undefined,
+                  cancelledAt: updatedTransfer.cancelledAt || undefined,
+                });
+              }
+            }, 2000);
+          } catch (syncErr) {
+            console.warn("Failed to sync updated transfer to Convex:", syncErr);
+          }
+        }
+        
+        // Reset loading state - Convex will auto-update via query
+        setActingId(null);
       }
     } catch (err) {
+      clearTimeout(safetyTimeout);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes("cancelled") || errMsg.includes("closed") || errMsg.includes("timeout")) {
+        toast.info("Transaction cancelled. You can try again by clicking Cancel.");
+      } else {
       toast.error("Cancel failed");
+      }
       console.error(err);
     } finally {
+      clearTimeout(safetyTimeout);
       setActingId(null);
     }
   };
 
+
+  // Recalculate user stats from transactions table after transfers are loaded
+  // This ensures stats are always accurate, even if transfer syncing had issues
   useEffect(() => {
-    void loadTransfers();
-  }, [loadTransfers]);
+    if (isConvexConfigured() && address && transfers.length > 0 && !loading) {
+      // Only recalculate after transfers are loaded and not loading
+      // Use a ref to avoid including recalculateUserStats in dependencies
+      const recalc = async () => {
+        try {
+          await recalculateUserStats(address);
+          console.log("[HistoryPage] Recalculated user stats from transactions");
+        } catch (err) {
+          console.warn("[HistoryPage] Failed to recalculate user stats:", err);
+        }
+      };
+      void recalc();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, transfers.length, loading]); // Only recalculate when transfers change or loading completes
 
   // Set up periodic refresh for pending transactions
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -265,15 +454,27 @@ export default function HistoryPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Transfer history</CardTitle>
-                    <CardDescription>
-                      Your sent and received transfers. Complete or cancel pending transfers.
-                    </CardDescription>
+                <CardTitle>Transfer history</CardTitle>
+                <CardDescription>
+                  Your sent and received transfers. Complete or cancel pending transfers.
+                </CardDescription>
+                    {transfers.some(t => t.status === "pending" && t.recipient === address) && (
+                      <div className="mt-3 p-3 rounded-lg border border-yellow-500/50 bg-yellow-500/10 text-sm">
+                        <p className="text-yellow-400 font-semibold mb-1">⚠️ Pending transfers waiting for completion</p>
+                        <p className="text-muted-foreground text-xs">
+                          Funds are held in escrow. Click &quot;Complete&quot; on pending transfers where you are the recipient to receive the funds.
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => loadTransfers()}
+                    onClick={() => {
+                      // Convex queries auto-update, no need to reload
+                      // Just reset loading state if needed
+                      setLoading(false);
+                    }}
                     disabled={loading}
                   >
                     {loading ? (
@@ -322,7 +523,7 @@ export default function HistoryPage() {
                     {transfers.length > 0 && (
                       <div>
                         <h3 className="text-sm font-semibold mb-3">Confirmed Transfers</h3>
-                        <ul className="space-y-3">
+                  <ul className="space-y-3">
                           {transfers.map((t) => {
                             const { network, explorerUrl } = getContractAddresses();
                             const chainParam = network === "testnet" ? "?chain=testnet" : "";
@@ -348,8 +549,8 @@ export default function HistoryPage() {
                             };
 
                             return (
-                              <li
-                                key={t.id}
+                      <li
+                        key={t.id}
                                 className="rounded-lg border border-border p-4 space-y-3"
                               >
                                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -380,6 +581,16 @@ export default function HistoryPage() {
                                         </span>
                                       )}
                                     </p>
+                                    {t.status === "pending" && isRecipient && (
+                                      <p className="text-xs text-yellow-400 mt-1 font-medium">
+                                        💰 Funds are in escrow - Click &quot;Complete&quot; to receive them
+                                      </p>
+                                    )}
+                                    {t.status === "pending" && isSender && (
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        Funds are in escrow waiting for recipient to complete
+                                      </p>
+                                    )}
                                     <div className="text-xs text-muted-foreground space-y-0.5">
                                       <p>
                                         {isSender ? "To" : "From"}:{" "}
@@ -464,36 +675,36 @@ export default function HistoryPage() {
                                         </p>
                                       )}
                                     </div>
-                                  </div>
-                                  <div className="flex gap-2">
+                        </div>
+                        <div className="flex gap-2">
                                     {t.status === "pending" && isRecipient && (
-                                      <Button
-                                        size="sm"
-                                        variant="default"
-                                        disabled={actingId !== null}
-                                        onClick={() => onComplete(t)}
-                                      >
-                                        {actingId === t.id ? (
-                                          <Loader2 className="size-4 animate-spin" />
-                                        ) : (
-                                          "Complete"
-                                        )}
-                                      </Button>
-                                    )}
+                            <Button
+                              size="sm"
+                              variant="default"
+                              disabled={actingId !== null}
+                              onClick={() => onComplete(t)}
+                            >
+                              {actingId === t.id ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                "Complete"
+                              )}
+                            </Button>
+                          )}
                                     {t.status === "pending" && isSender && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={actingId !== null}
-                                        onClick={() => onCancel(t)}
-                                      >
-                                        {actingId === t.id ? (
-                                          <Loader2 className="size-4 animate-spin" />
-                                        ) : (
-                                          "Cancel"
-                                        )}
-                                      </Button>
-                                    )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={actingId !== null}
+                              onClick={() => onCancel(t)}
+                            >
+                              {actingId === t.id ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                "Cancel"
+                              )}
+                            </Button>
+                          )}
                                     {txIds.initiateTxId ? (
                                       <Button
                                         size="sm"
@@ -528,11 +739,11 @@ export default function HistoryPage() {
                                       </Button>
                                     )}
                                   </div>
-                                </div>
-                              </li>
+                        </div>
+                      </li>
                             );
                           })}
-                        </ul>
+                  </ul>
                       </div>
                     )}
                   </>

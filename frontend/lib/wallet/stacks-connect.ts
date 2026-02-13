@@ -281,18 +281,35 @@ export async function requestContractCall(
     // Ensure wallet uses the same network as app (avoids "Not a valid contract" on testnet)
     if (network) payload.network = network;
 
-    const result = await mod.request("stx_callContract", payload);
+    // Add timeout to prevent hanging if wallet popup is closed
+    // 5 minutes should be enough for user to approve, but prevents infinite waiting
+    const timeoutMs = 5 * 60 * 1000; // 5 minutes
+    const requestPromise = mod.request("stx_callContract", payload);
+    
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error("Transaction request timed out. The wallet popup may have been closed. Please try again."));
+      }, timeoutMs);
+    });
+
+    const result = await Promise.race([requestPromise, timeoutPromise]);
 
     return result?.txId ?? result?.txid ?? null;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const isUserRejection =
-      /rejected|denied|cancel|user said no/i.test(msg) || msg === "User rejected request";
+      /rejected|denied|cancel|user said no|timeout|closed/i.test(msg) || 
+      msg === "User rejected request" ||
+      msg.includes("timed out");
+    
     if (!isUserRejection) {
       console.error("[stacks-connect] requestContractCall failed:", err);
     }
-    // Rethrow so the hook can show "Transaction cancelled" instead of a generic error
-    if (isUserRejection) throw err;
+    
+    // Rethrow user rejections/timeouts so the hook can show appropriate message
+    if (isUserRejection) {
+      throw new Error(msg.includes("timed out") ? msg : "Transaction cancelled or wallet closed");
+    }
     return null;
   }
 }

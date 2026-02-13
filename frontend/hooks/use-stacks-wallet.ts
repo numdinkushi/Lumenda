@@ -9,6 +9,8 @@ import {
   requestContractCall as requestContractCallLib,
 } from "@/lib/wallet";
 import { clearPlaceholderAddresses } from "@/lib/wallet/storage";
+import { useGetOrCreateUser } from "@/hooks/use-users";
+import { isConvexConfigured } from "@/lib/convex/client";
 
 export interface UseStacksWalletResult {
   /** Whether an address is set (from current connect or cache) */
@@ -35,6 +37,7 @@ export function useStacksWallet(): UseStacksWalletResult {
   const [address, setAddress] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
+  const getOrCreateUser = useGetOrCreateUser();
 
   // Restore address from @stacks/connect localStorage on mount
   useEffect(() => {
@@ -49,6 +52,14 @@ export function useStacksWallet(): UseStacksWalletResult {
         if (cached) {
           console.log("[useStacksWallet] Restored address from our cache:", cached);
           setAddress(cached);
+          // Create/update user in Convex when address is restored
+          if (isConvexConfigured() && cached) {
+            try {
+              await getOrCreateUser(cached);
+            } catch (err) {
+              console.warn("[useStacksWallet] Failed to create/update user in Convex:", err);
+            }
+          }
           return;
         }
 
@@ -65,6 +76,14 @@ export function useStacksWallet(): UseStacksWalletResult {
               setAddress(addr);
               const { setStoredAddress } = await import("@/lib/wallet/storage");
               setStoredAddress(addr);
+              // Create/update user in Convex when address is restored
+              if (isConvexConfigured() && addr) {
+                try {
+                  await getOrCreateUser(addr);
+                } catch (err) {
+                  console.warn("[useStacksWallet] Failed to create/update user in Convex:", err);
+                }
+              }
               return;
             }
           }
@@ -85,7 +104,7 @@ export function useStacksWallet(): UseStacksWalletResult {
     };
 
     void restoreAddress();
-  }, []);
+  }, [getOrCreateUser]);
 
   const connect = useCallback(async () => {
     setConnectError(null);
@@ -95,6 +114,16 @@ export function useStacksWallet(): UseStacksWalletResult {
       if (result && result.address) {
         setAddress(result.address);
         setConnectError(null);
+        // Create/update user in Convex when wallet connects
+        if (isConvexConfigured() && result.address) {
+          try {
+            await getOrCreateUser(result.address);
+            console.log("[useStacksWallet] User created/updated in Convex:", result.address);
+          } catch (err) {
+            console.warn("[useStacksWallet] Failed to create/update user in Convex:", err);
+            // Don't fail the connection if Convex fails
+          }
+        }
       } else {
         setConnectError("Could not get address from wallet. Please try again.");
       }
@@ -105,7 +134,7 @@ export function useStacksWallet(): UseStacksWalletResult {
     } finally {
       setIsConnecting(false);
     }
-  }, []);
+  }, [getOrCreateUser]);
 
   const disconnect = useCallback(async () => {
     await disconnectWallet();

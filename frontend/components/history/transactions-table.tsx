@@ -44,7 +44,7 @@ interface TransactionsTableProps {
   currentAddress?: string;
 }
 
-export function TransactionsTable({ transactions, currentAddress }: TransactionsTableProps) {
+export function TransactionsTable({ transactions }: TransactionsTableProps) {
   const { network, explorerUrl } = getContractAddresses();
   const chainParam = network === "testnet" ? "?chain=testnet" : "";
 

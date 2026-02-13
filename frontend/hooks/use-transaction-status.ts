@@ -8,7 +8,6 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { fetchTransactionStatus } from "@/lib/utils/transaction-status";
 import { isConvexConfigured } from "@/lib/convex/client";
-import type { Id } from "@/convex/_generated/dataModel";
 
 type UpdateTransactionStatusArgs = {
   txId: string;

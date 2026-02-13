@@ -19,7 +19,7 @@ import { getExplorerUrl } from "@/constants/contracts";
 import { getContractAddresses } from "@/config/contracts";
 import { NETWORK_ERROR_MESSAGE } from "@/lib/utils/contract-errors";
 
-function getStacksNetwork(): StacksTestnet | StacksMainnet {
+export function getStacksNetwork(): StacksTestnet | StacksMainnet {
   const { network, rpcUrl } = getContractAddresses();
   if (network === "mainnet") {
     return new StacksMainnet(rpcUrl ? { url: rpcUrl } : undefined);

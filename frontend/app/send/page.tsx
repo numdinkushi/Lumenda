@@ -108,8 +108,8 @@ export default function SendPage() {
         }
         
         toast.success(
-          <div className="space-y-1">
-            <p>Transaction submitted</p>
+          <div className="space-y-2">
+            <p className="font-semibold">Transaction submitted successfully!</p>
             <a
               href={fullExplorerUrl}
               target="_blank"
@@ -118,11 +118,16 @@ export default function SendPage() {
             >
               View on explorer (tx: {txId.slice(0, 8)}...)
             </a>
+            <div className="text-xs text-muted-foreground space-y-1 border-t border-border/50 pt-2 mt-2">
+              <p className="font-semibold text-yellow-400">⚠️ Important: Funds are in escrow</p>
+              <p>The recipient ({recipient.trim().slice(0, 8)}...) must connect their wallet and complete the transfer to receive the funds.</p>
+              <p>They can do this by going to the History page and clicking &quot;Complete&quot; on the pending transfer.</p>
+            </div>
             <p className="text-xs text-muted-foreground">
               Check your Leather wallet to approve. Transaction may take 1-2 minutes to confirm.
             </p>
           </div>,
-          { duration: 10000 }
+          { duration: 15000 }
         );
         setAmount("");
         setRecipient("");
@@ -159,7 +164,7 @@ export default function SendPage() {
               <CardHeader>
                 <CardTitle>Send money</CardTitle>
                 <CardDescription>
-                  Enter amount and recipient. Fee is calculated from the current contract rate.
+                  Enter amount and recipient. Funds are held in escrow until the recipient completes the transfer.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
