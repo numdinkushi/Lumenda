@@ -45,8 +45,7 @@ clarinet test
   - Core remittance contract
   - Escrow contract
   - Test suite
-  - Documentation
-
+  - Documentation 
 **PR Description should include:**
 - What was added (new Clarity contracts)
 - How to test

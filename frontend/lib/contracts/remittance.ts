@@ -7,7 +7,6 @@ import {
   Cl,
   ClarityType,
   cvToHex,
-  hexToCV,
   principalToString,
   type ClarityValue,
   type PrincipalCV,
