@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -35,40 +35,54 @@ export function AppHome() {
   const recentTransfers = useUserTransfers(address, undefined, 5); // Get latest 5 transfers
   const [pendingTransfers, setPendingTransfers] = useState<Transfer[]>([]);
 
-  const loadPendingTransfers = useCallback(async () => {
+  useEffect(() => {
     if (!address) {
       setPendingTransfers([]);
       return;
     }
-    try {
-      const count = await loadTransferCount();
-      if (count === null || count === 0) {
-        setPendingTransfers([]);
-        return;
-      }
-      const list: Transfer[] = [];
-      for (let id = 1; id <= count; id++) {
-        try {
-          const t = await loadTransfer(id);
-          if (t && t.status === "pending" && t.recipient === address) {
-            list.push(t);
+
+    let cancelled = false;
+
+    const loadPendingTransfers = async () => {
+      try {
+        const count = await loadTransferCount();
+        if (cancelled) return;
+        
+        if (count === null || count === 0) {
+          if (!cancelled) setPendingTransfers([]);
+          return;
+        }
+        const list: Transfer[] = [];
+        for (let id = 1; id <= count; id++) {
+          if (cancelled) return;
+          try {
+            const t = await loadTransfer(id);
+            if (t && t.status === "pending" && t.recipient === address) {
+              list.push(t);
+            }
+          } catch (e) {
+            // Skip individual transfer errors
+            console.warn(`Failed to load transfer ${id}:`, e);
           }
-        } catch (e) {
-          // Skip individual transfer errors
-          console.warn(`Failed to load transfer ${id}:`, e);
+        }
+        if (!cancelled) {
+          list.sort((a, b) => b.createdAt - a.createdAt);
+          setPendingTransfers(list);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.error("Failed to load pending transfers:", e);
+          setPendingTransfers([]);
         }
       }
-      list.sort((a, b) => b.createdAt - a.createdAt);
-      setPendingTransfers(list);
-    } catch (e) {
-      console.error("Failed to load pending transfers:", e);
-      setPendingTransfers([]);
-    }
-  }, [address, loadTransfer, loadTransferCount]);
+    };
 
-  useEffect(() => {
     void loadPendingTransfers();
-  }, [loadPendingTransfers]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [address, loadTransfer, loadTransferCount]);
 
   return (
     <>

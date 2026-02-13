@@ -38,7 +38,6 @@ export const upsertTransfer = mutation({
       .first();
 
     const now = Math.floor(Date.now() / 1000);
-    const wasNew = !existing;
     const statusChanged = existing && existing.status !== args.status;
     const previousStatus = existing?.status;
 

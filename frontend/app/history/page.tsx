@@ -29,7 +29,7 @@ import { formatStx } from "@/lib/stx";
 import { toast } from "sonner";
 import { ExternalLink } from "lucide-react";
 import { useUserTransactions } from "@/hooks/use-transactions";
-import { useCreateTransaction, useSyncTransfer, useUpdateUserStats, useRecalculateUserStats } from "@/lib/convex/utils";
+import { useCreateTransaction, useSyncTransfer, useRecalculateUserStats } from "@/lib/convex/utils";
 import { isConvexConfigured } from "@/lib/convex/client";
 import { TransactionsTable, type TransactionRow } from "@/components/history/transactions-table";
 import { useUpdatePendingTransactions } from "@/hooks/use-transaction-status";
