@@ -107,9 +107,18 @@ export default function HistoryPage() {
   const onComplete = async (t: Transfer) => {
     if (t.status !== "pending" || t.recipient !== address || !address) return;
     setActingId(t.id);
+    
+    // Add a safety timeout to ensure actingId is reset even if something hangs
+    const safetyTimeout = setTimeout(() => {
+      console.warn("Complete transfer operation timed out, resetting state");
+      setActingId(null);
+    }, 6 * 60 * 1000); // 6 minutes (slightly longer than requestContractCall timeout)
+    
     try {
       const params = buildCompleteTransferParams(t.id);
       const txId = await executeContractCall(params);
+      clearTimeout(safetyTimeout);
+      
       if (txId) {
         // Track transaction in Convex
         if (isConvexConfigured()) {
@@ -152,9 +161,16 @@ export default function HistoryPage() {
         await loadTransfers();
       }
     } catch (err) {
-      toast.error("Complete failed");
+      clearTimeout(safetyTimeout);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes("cancelled") || errMsg.includes("closed") || errMsg.includes("timeout")) {
+        toast.info("Transaction cancelled. You can try again by clicking Complete.");
+      } else {
+        toast.error("Complete failed");
+      }
       console.error(err);
     } finally {
+      clearTimeout(safetyTimeout);
       setActingId(null);
     }
   };
@@ -162,9 +178,18 @@ export default function HistoryPage() {
   const onCancel = async (t: Transfer) => {
     if (t.status !== "pending" || t.sender !== address || !address) return;
     setActingId(t.id);
+    
+    // Add a safety timeout to ensure actingId is reset even if something hangs
+    const safetyTimeout = setTimeout(() => {
+      console.warn("Cancel transfer operation timed out, resetting state");
+      setActingId(null);
+    }, 6 * 60 * 1000); // 6 minutes (slightly longer than requestContractCall timeout)
+    
     try {
       const params = buildCancelTransferParams(t.id);
       const txId = await executeContractCall(params);
+      clearTimeout(safetyTimeout);
+      
       if (txId) {
         // Track transaction in Convex
         if (isConvexConfigured()) {
@@ -207,9 +232,16 @@ export default function HistoryPage() {
         await loadTransfers();
       }
     } catch (err) {
-      toast.error("Cancel failed");
+      clearTimeout(safetyTimeout);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes("cancelled") || errMsg.includes("closed") || errMsg.includes("timeout")) {
+        toast.info("Transaction cancelled. You can try again by clicking Cancel.");
+      } else {
+        toast.error("Cancel failed");
+      }
       console.error(err);
     } finally {
+      clearTimeout(safetyTimeout);
       setActingId(null);
     }
   };
@@ -269,6 +301,14 @@ export default function HistoryPage() {
                     <CardDescription>
                       Your sent and received transfers. Complete or cancel pending transfers.
                     </CardDescription>
+                    {transfers.some(t => t.status === "pending" && t.recipient === address) && (
+                      <div className="mt-3 p-3 rounded-lg border border-yellow-500/50 bg-yellow-500/10 text-sm">
+                        <p className="text-yellow-400 font-semibold mb-1">⚠️ Pending transfers waiting for completion</p>
+                        <p className="text-muted-foreground text-xs">
+                          Funds are held in escrow. Click "Complete" on pending transfers where you are the recipient to receive the funds.
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <Button
                     variant="outline"
@@ -380,6 +420,16 @@ export default function HistoryPage() {
                                         </span>
                                       )}
                                     </p>
+                                    {t.status === "pending" && isRecipient && (
+                                      <p className="text-xs text-yellow-400 mt-1 font-medium">
+                                        💰 Funds are in escrow - Click "Complete" to receive them
+                                      </p>
+                                    )}
+                                    {t.status === "pending" && isSender && (
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        Funds are in escrow waiting for recipient to complete
+                                      </p>
+                                    )}
                                     <div className="text-xs text-muted-foreground space-y-0.5">
                                       <p>
                                         {isSender ? "To" : "From"}:{" "}

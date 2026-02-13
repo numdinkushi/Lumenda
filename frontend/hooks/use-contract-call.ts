@@ -32,15 +32,20 @@ export function useContractCall() {
         return null;
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Transaction failed";
-        const isUserRejection = /rejected|denied|cancel|user said no/i.test(msg);
+        const isUserRejection = /rejected|denied|cancel|user said no|timeout|closed/i.test(msg);
         setError(msg);
         if (isUserRejection) {
-          toast.info("Transaction cancelled");
+          if (msg.includes("timed out") || msg.includes("closed")) {
+            toast.info("Transaction cancelled - wallet popup was closed. You can try again.");
+          } else {
+            toast.info("Transaction cancelled");
+          }
         } else {
           toast.error(msg);
         }
         return null;
       } finally {
+        // Always reset loading state, even if promise hangs
         setLoading(false);
       }
     },

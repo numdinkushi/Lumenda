@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -11,15 +12,98 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Send, ArrowRightLeft, History, Shield } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Send, ArrowRightLeft, History, Shield, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useWallet } from "@/contexts/wallet-context";
+import { useRemittance } from "@/hooks/use-remittance";
+import { formatStx } from "@/lib/stx";
+import type { Transfer } from "@/lib/contracts";
 
 /**
  * Main app content for home (Send, Recent transfers, How it works).
  * Shown at / when wallet is connected.
  */
 export function AppHome() {
+  const { address } = useWallet();
+  const { loadTransfer, loadTransferCount } = useRemittance();
+  const [pendingTransfers, setPendingTransfers] = useState<Transfer[]>([]);
+  const [loadingPending, setLoadingPending] = useState(true);
+
+  const loadPendingTransfers = useCallback(async () => {
+    if (!address) {
+      setPendingTransfers([]);
+      setLoadingPending(false);
+      return;
+    }
+    setLoadingPending(true);
+    try {
+      const count = await loadTransferCount();
+      if (count === null || count === 0) {
+        setPendingTransfers([]);
+        return;
+      }
+      const list: Transfer[] = [];
+      for (let id = 1; id <= count; id++) {
+        try {
+          const t = await loadTransfer(id);
+          if (t && t.status === "pending" && t.recipient === address) {
+            list.push(t);
+          }
+        } catch (e) {
+          // Skip individual transfer errors
+          console.warn(`Failed to load transfer ${id}:`, e);
+        }
+      }
+      list.sort((a, b) => b.createdAt - a.createdAt);
+      setPendingTransfers(list);
+    } catch (e) {
+      console.error("Failed to load pending transfers:", e);
+      setPendingTransfers([]);
+    } finally {
+      setLoadingPending(false);
+    }
+  }, [address, loadTransfer, loadTransferCount]);
+
+  useEffect(() => {
+    void loadPendingTransfers();
+  }, [loadPendingTransfers]);
+
   return (
     <>
+      {/* Notification banner for pending transfers waiting completion */}
+      {pendingTransfers.length > 0 && (
+        <Alert className="mb-6 border-yellow-500/50 bg-yellow-500/10">
+          <AlertCircle className="h-4 w-4 text-yellow-400" />
+          <AlertTitle className="text-yellow-400 font-semibold">
+            {pendingTransfers.length} Pending Transfer{pendingTransfers.length > 1 ? "s" : ""} Waiting for You
+          </AlertTitle>
+          <AlertDescription className="text-sm text-muted-foreground mt-2 space-y-2">
+            <p>
+              You have {pendingTransfers.length} transfer{pendingTransfers.length > 1 ? "s" : ""} with funds waiting in escrow.
+              Complete {pendingTransfers.length > 1 ? "them" : "it"} to receive your money.
+            </p>
+            <div className="space-y-1">
+              {pendingTransfers.slice(0, 3).map((t) => (
+                <div key={t.id} className="flex items-center justify-between text-xs">
+                  <span>
+                    Transfer #{t.id}: {formatStx(BigInt(t.amount))} STX from {t.sender.slice(0, 8)}...
+                  </span>
+                </div>
+              ))}
+              {pendingTransfers.length > 3 && (
+                <p className="text-xs text-muted-foreground">
+                  +{pendingTransfers.length - 3} more transfer{pendingTransfers.length - 3 > 1 ? "s" : ""}
+                </p>
+              )}
+            </div>
+            <Button asChild size="sm" variant="default" className="mt-2">
+              <Link href="/history">
+                Go to History to Complete <ArrowRightLeft className="ml-2 h-3 w-3" />
+              </Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
       <section className="text-center space-y-4 mb-16">
         <Badge variant="secondary" className="mb-2">
           Stacks · Low fees
