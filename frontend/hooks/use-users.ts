@@ -6,39 +6,49 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { getConvexNetworkInfo } from "@/lib/convex/utils";
+import { isConvexConfigured } from "@/lib/convex/client";
+import type { Id } from "@/convex/_generated/dataModel";
+
+type GetOrCreateUserArgs = {
+  address: string;
+  network: "testnet" | "mainnet";
+};
+
+type UpdateUserStatsArgs = {
+  address: string;
+  network: "testnet" | "mainnet";
+  isSender: boolean;
+  amount: string;
+};
 
 /**
  * Get user by address.
  */
 export function useUser(address: string | null) {
   const { network } = getConvexNetworkInfo();
-  try {
-    return useQuery(
-      api.users.getUser,
-      address ? { address, network } : "skip"
-    );
-  } catch {
-    return undefined;
-  }
+  const isConfigured = isConvexConfigured();
+  // Always call useQuery unconditionally (React rules)
+  const queryResult = useQuery(
+    api.users.getUser,
+    isConfigured && address ? { address, network } : "skip"
+  );
+  return isConfigured ? queryResult : undefined;
 }
 
 /**
  * Get or create user record.
  */
 export function useGetOrCreateUser() {
-  let getOrCreateUser: ((args: any) => Promise<any>) | null = null;
-  try {
-    getOrCreateUser = useMutation(api.users.getOrCreateUser);
-  } catch {
-    getOrCreateUser = null;
-  }
+  // Always call useMutation unconditionally (React rules)
+  const getOrCreateUserMutation = useMutation(api.users.getOrCreateUser);
   const { network } = getConvexNetworkInfo();
+  const isConfigured = isConvexConfigured();
 
-  return async (address: string) => {
-    if (!getOrCreateUser) {
+  return async (address: string): Promise<Id<"users"> | null> => {
+    if (!isConfigured) {
       return null;
     }
-    return await getOrCreateUser({ address, network });
+    return await getOrCreateUserMutation({ address, network } as GetOrCreateUserArgs);
   };
 }
 
@@ -46,22 +56,19 @@ export function useGetOrCreateUser() {
  * Update user statistics.
  */
 export function useUpdateUserStats() {
-  let updateUserStats: ((args: any) => Promise<any>) | null = null;
-  try {
-    updateUserStats = useMutation(api.users.updateUserStats);
-  } catch {
-    updateUserStats = null;
-  }
+  // Always call useMutation unconditionally (React rules)
+  const updateUserStatsMutation = useMutation(api.users.updateUserStats);
   const { network } = getConvexNetworkInfo();
+  const isConfigured = isConvexConfigured();
 
   return async (
     address: string,
     isSender: boolean,
     amount: string
-  ) => {
-    if (!updateUserStats) {
+  ): Promise<Id<"users"> | null> => {
+    if (!isConfigured) {
       return null;
     }
-    return await updateUserStats({ address, network, isSender, amount });
+    return await updateUserStatsMutation({ address, network, isSender, amount } as UpdateUserStatsArgs);
   };
 }

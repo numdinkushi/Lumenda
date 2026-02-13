@@ -7,33 +7,37 @@ import { useEffect, useCallback, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { fetchTransactionStatus } from "@/lib/utils/transaction-status";
+import { isConvexConfigured } from "@/lib/convex/client";
+import type { Id } from "@/convex/_generated/dataModel";
+
+type UpdateTransactionStatusArgs = {
+  txId: string;
+  status: "pending" | "success" | "abort_by_response" | "abort_by_post_condition";
+  blockHeight?: number;
+};
 
 /**
  * Hook to check and update a single transaction status from blockchain.
  */
 export function useCheckAndUpdateTransactionStatus() {
-  let updateStatus: ((args: any) => Promise<any>) | null = null;
-  try {
-    updateStatus = useMutation(api.transactions.updateTransactionStatus);
-  } catch {
-    // Convex not configured or provider not available
-    updateStatus = null;
-  }
+  // Always call useMutation unconditionally (React rules)
+  const updateStatusMutation = useMutation(api.transactions.updateTransactionStatus);
+  const isConfigured = isConvexConfigured();
   const [isUpdating, setIsUpdating] = useState(false);
 
   const checkAndUpdate = useCallback(
     async (txId: string) => {
-      if (isUpdating || !updateStatus) return;
+      if (isUpdating || !isConfigured) return;
       
       setIsUpdating(true);
       try {
         const status = await fetchTransactionStatus(txId);
         if (status && status.status !== "pending") {
-          await updateStatus({
+          await updateStatusMutation({
             txId: status.txId,
             status: status.status,
             blockHeight: status.blockHeight,
-          });
+          } as UpdateTransactionStatusArgs);
           return status;
         }
         return null;
@@ -44,7 +48,7 @@ export function useCheckAndUpdateTransactionStatus() {
         setIsUpdating(false);
       }
     },
-    [updateStatus, isUpdating]
+    [updateStatusMutation, isUpdating, isConfigured]
   );
 
   return { checkAndUpdate, isUpdating };
@@ -90,18 +94,14 @@ export function usePollTransactionStatus(txId: string | null, enabled = true) {
  * Hook to check and update multiple pending transactions.
  */
 export function useUpdatePendingTransactions() {
-  let updateStatus: ((args: any) => Promise<any>) | null = null;
-  try {
-    updateStatus = useMutation(api.transactions.updateTransactionStatus);
-  } catch {
-    // Convex not configured or provider not available
-    updateStatus = null;
-  }
+  // Always call useMutation unconditionally (React rules)
+  const updateStatusMutation = useMutation(api.transactions.updateTransactionStatus);
+  const isConfigured = isConvexConfigured();
   const [isUpdating, setIsUpdating] = useState(false);
 
   const updatePending = useCallback(
     async (txIds: string[]) => {
-      if (isUpdating || txIds.length === 0 || !updateStatus) return [];
+      if (isUpdating || txIds.length === 0 || !isConfigured) return [];
       
       setIsUpdating(true);
       try {
@@ -109,11 +109,11 @@ export function useUpdatePendingTransactions() {
           txIds.map(async (txId) => {
             const status = await fetchTransactionStatus(txId);
             if (status && status.status !== "pending") {
-              await updateStatus({
+              await updateStatusMutation({
                 txId: status.txId,
                 status: status.status,
                 blockHeight: status.blockHeight,
-              });
+              } as UpdateTransactionStatusArgs);
               return { txId, status: status.status };
             }
             return null;
@@ -133,7 +133,7 @@ export function useUpdatePendingTransactions() {
         setIsUpdating(false);
       }
     },
-    [updateStatus, isUpdating]
+    [updateStatusMutation, isUpdating, isConfigured]
   );
 
   return { updatePending, isUpdating };

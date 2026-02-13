@@ -6,6 +6,54 @@
 import { getContractAddresses } from "@/config/contracts";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { isConvexConfigured } from "./client";
+import type { Id } from "@/convex/_generated/dataModel";
+
+type CreateTransactionArgs = {
+  txId: string;
+  transferId: number;
+  transactionType: "initiate" | "complete" | "cancel";
+  userAddress: string;
+  contractAddress: string;
+  contractName: string;
+  network: "testnet" | "mainnet";
+  status: "pending" | "success" | "abort_by_response" | "abort_by_post_condition";
+  timestamp: number;
+  blockHeight?: number;
+  metadata?: {
+    fee?: string;
+    amount?: string;
+    recipient?: string;
+    sender?: string;
+  };
+};
+
+type UpsertTransferArgs = {
+  transferId: number;
+  sender: string;
+  recipient: string;
+  amount: string;
+  fee: string;
+  totalAmount: string;
+  status: "pending" | "completed" | "cancelled";
+  createdAt: number;
+  completedAt?: number;
+  cancelledAt?: number;
+  network: "testnet" | "mainnet";
+  contractAddress: string;
+};
+
+type GetOrCreateUserArgs = {
+  address: string;
+  network: "testnet" | "mainnet";
+};
+
+type UpdateUserStatsArgs = {
+  address: string;
+  network: "testnet" | "mainnet";
+  isSender: boolean;
+  amount: string;
+};
 
 /**
  * Get network and contract information for Convex operations.
@@ -26,14 +74,10 @@ export function getConvexNetworkInfo() {
  * Call this immediately after a transaction is submitted to track it.
  */
 export function useCreateTransaction() {
-  let createTransaction: ((args: any) => Promise<any>) | null = null;
-  try {
-    createTransaction = useMutation(api.transactions.createTransaction);
-  } catch {
-    // Convex not configured or provider not available
-    createTransaction = null;
-  }
+  // Always call useMutation unconditionally (React rules)
+  const createTransactionMutation = useMutation(api.transactions.createTransaction);
   const { network, contractAddress, contractName } = getConvexNetworkInfo();
+  const isConfigured = isConvexConfigured();
 
   return async (
     txId: string,
@@ -47,14 +91,14 @@ export function useCreateTransaction() {
       recipient?: string;
       sender?: string;
     }
-  ) => {
-    if (!createTransaction) {
+  ): Promise<Id<"transactions"> | null> => {
+    if (!isConfigured) {
       // Convex not configured, skip
       return null;
     }
     const timestamp = Math.floor(Date.now() / 1000);
 
-    return await createTransaction({
+    return await createTransactionMutation({
       txId,
       transferId,
       transactionType,
@@ -65,7 +109,7 @@ export function useCreateTransaction() {
       status,
       timestamp,
       metadata,
-    });
+    } as CreateTransactionArgs);
   };
 }
 
@@ -74,14 +118,10 @@ export function useCreateTransaction() {
  * Call this to cache transfer data for faster access.
  */
 export function useSyncTransfer() {
-  let upsertTransfer: ((args: any) => Promise<any>) | null = null;
-  try {
-    upsertTransfer = useMutation(api.transfers.upsertTransfer);
-  } catch {
-    // Convex not configured or provider not available
-    upsertTransfer = null;
-  }
+  // Always call useMutation unconditionally (React rules)
+  const upsertTransferMutation = useMutation(api.transfers.upsertTransfer);
   const { network, contractAddress } = getConvexNetworkInfo();
+  const isConfigured = isConvexConfigured();
 
   return async (transfer: {
     transferId: number;
@@ -94,16 +134,16 @@ export function useSyncTransfer() {
     createdAt: number;
     completedAt?: number;
     cancelledAt?: number;
-  }) => {
-    if (!upsertTransfer) {
+  }): Promise<Id<"transfers"> | null> => {
+    if (!isConfigured) {
       // Convex not configured, skip
       return null;
     }
-    return await upsertTransfer({
+    return await upsertTransferMutation({
       ...transfer,
       network,
       contractAddress,
-    });
+    } as UpsertTransferArgs);
   };
 }
 
@@ -111,24 +151,20 @@ export function useSyncTransfer() {
  * Get or create user record in Convex.
  */
 export function useGetOrCreateUser() {
-  let getOrCreateUser: ((args: any) => Promise<any>) | null = null;
-  try {
-    getOrCreateUser = useMutation(api.users.getOrCreateUser);
-  } catch {
-    // Convex not configured or provider not available
-    getOrCreateUser = null;
-  }
+  // Always call useMutation unconditionally (React rules)
+  const getOrCreateUserMutation = useMutation(api.users.getOrCreateUser);
   const { network } = getConvexNetworkInfo();
+  const isConfigured = isConvexConfigured();
 
-  return async (address: string) => {
-    if (!getOrCreateUser) {
+  return async (address: string): Promise<Id<"users"> | null> => {
+    if (!isConfigured) {
       // Convex not configured, skip
       return null;
     }
-    return await getOrCreateUser({
+    return await getOrCreateUserMutation({
       address,
       network,
-    });
+    } as GetOrCreateUserArgs);
   };
 }
 
@@ -136,29 +172,25 @@ export function useGetOrCreateUser() {
  * Update user statistics when a transfer occurs.
  */
 export function useUpdateUserStats() {
-  let updateUserStats: ((args: any) => Promise<any>) | null = null;
-  try {
-    updateUserStats = useMutation(api.users.updateUserStats);
-  } catch {
-    // Convex not configured or provider not available
-    updateUserStats = null;
-  }
+  // Always call useMutation unconditionally (React rules)
+  const updateUserStatsMutation = useMutation(api.users.updateUserStats);
   const { network } = getConvexNetworkInfo();
+  const isConfigured = isConvexConfigured();
 
   return async (
     address: string,
     isSender: boolean,
     amount: string
-  ) => {
-    if (!updateUserStats) {
+  ): Promise<Id<"users"> | null> => {
+    if (!isConfigured) {
       // Convex not configured, skip
       return null;
     }
-    return await updateUserStats({
+    return await updateUserStatsMutation({
       address,
       network,
       isSender,
       amount,
-    });
+    } as UpdateUserStatsArgs);
   };
 }

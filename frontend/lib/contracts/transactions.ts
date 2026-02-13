@@ -21,10 +21,8 @@ export async function fetchRecentTransactions(
   address: string,
   limit: number = 50
 ): Promise<TransactionInfo[]> {
-  const { network, rpcUrl } = getContractAddresses();
-  const { contracts } = getContractAddresses();
+  const { rpcUrl, contracts } = getContractAddresses();
   const remittanceContract = contracts.remittance;
-  const [contractAddress, contractName] = remittanceContract.split(".");
 
   try {
     // Query transactions for this address

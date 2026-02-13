@@ -3,7 +3,7 @@
  * DRY module for all escrow contract interactions.
  */
 
-import { Cl, ClarityType, cvToHex, hexToCV, principalToString } from "@stacks/transactions";
+import { Cl, ClarityType, cvToHex, principalToString } from "@stacks/transactions";
 import type { ClarityValue, PrincipalCV, TupleCV } from "@stacks/transactions";
 import { getContractAddresses } from "@/config/contracts";
 import { callReadOnlyFunction } from "@/lib/utils/contract-helpers";
