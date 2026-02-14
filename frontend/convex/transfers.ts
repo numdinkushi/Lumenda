@@ -102,39 +102,45 @@ export const getTransfersByUser = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Get transfers where user is sender
-    const sent = await ctx.db
+    // Get transfers where user is sender (with status filter if provided)
+    const sentQuery = ctx.db
       .query("transfers")
-      .withIndex("by_sender", (q) => q.eq("sender", args.userAddress))
-      .collect();
+      .withIndex("by_sender", (q) => q.eq("sender", args.userAddress));
+    
+    const sent = args.status
+      ? (await sentQuery.collect()).filter((t) => t.status === args.status)
+      : await sentQuery.collect();
 
-    // Get transfers where user is recipient
-    const received = await ctx.db
+    // Get transfers where user is recipient (with status filter if provided)
+    const receivedQuery = ctx.db
       .query("transfers")
-      .withIndex("by_recipient", (q) => q.eq("recipient", args.userAddress))
-      .collect();
+      .withIndex("by_recipient", (q) => q.eq("recipient", args.userAddress));
+    
+    const received = args.status
+      ? (await receivedQuery.collect()).filter((t) => t.status === args.status)
+      : await receivedQuery.collect();
 
-    // Combine and deduplicate
-    const allTransfers = [...sent, ...received];
-    const uniqueTransfers = Array.from(
-      new Map(allTransfers.map((t) => [t.transferId, t])).values()
-    );
-
-    // Filter by status if provided
-    let filtered = uniqueTransfers;
-    if (args.status) {
-      filtered = uniqueTransfers.filter((t) => t.status === args.status);
+    // Combine and deduplicate using Map (preserves insertion order for recent items)
+    const transferMap = new Map<number, typeof sent[0]>();
+    
+    // Add received first (typically more recent), then sent
+    for (const t of received) {
+      transferMap.set(t.transferId, t);
+    }
+    for (const t of sent) {
+      transferMap.set(t.transferId, t);
     }
 
-    // Sort by creation time descending
-    filtered.sort((a, b) => b.createdAt - a.createdAt);
+    // Convert to array and sort by creation time descending
+    const uniqueTransfers = Array.from(transferMap.values());
+    uniqueTransfers.sort((a, b) => b.createdAt - a.createdAt);
 
     // Apply limit if provided
     if (args.limit) {
-      return filtered.slice(0, args.limit);
+      return uniqueTransfers.slice(0, args.limit);
     }
 
-    return filtered;
+    return uniqueTransfers;
   },
 });
 

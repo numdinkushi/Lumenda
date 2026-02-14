@@ -3,7 +3,7 @@
 // Skip prerendering since this page requires client-side Convex hooks
 export const dynamic = "force-dynamic";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { Header } from "@/components/layout";
 import { RequireWallet } from "@/components/auth/require-wallet";
@@ -69,54 +69,71 @@ export default function HistoryPage() {
     }
   }, [userTransactions, updatePending]);
 
-  // Use Convex transfers as primary source (fast), fallback to contract if needed
-  // Use ref to track previous transfers and prevent infinite loops
-  const previousTransfersRef = useRef<string>("");
-  
+  // Use Convex transfers as primary source (fast)
+  // convexTransfers: undefined (loading) | [] (empty) | [transfers...] (has data)
   useEffect(() => {
     if (!address) {
       setTransfers([]);
       setLoading(false);
-      previousTransfersRef.current = "";
       return;
     }
 
-    // If Convex has transfers, use them (much faster)
-    if (convexTransfers && convexTransfers.length > 0) {
-      // Create a stable key from transfer IDs to detect actual changes
-      const transfersKey = convexTransfers
-        .map((ct) => `${ct.transferId}-${ct.status}-${ct.createdAt}`)
-        .join(",");
-      
-      // Only update if transfers actually changed
-      if (previousTransfersRef.current !== transfersKey) {
-        previousTransfersRef.current = transfersKey;
-        
-        // Convert Convex transfers to Transfer format
-        const formattedTransfers: Transfer[] = convexTransfers.map((ct) => ({
-          id: ct.transferId,
-          sender: ct.sender,
-          recipient: ct.recipient,
-          amount: ct.amount,
-          fee: ct.fee,
-          createdAt: ct.createdAt,
-          completedAt: ct.completedAt ?? null,
-          cancelledAt: ct.cancelledAt ?? null,
-          status: ct.status,
-        }));
-        formattedTransfers.sort((a, b) => b.createdAt - a.createdAt);
-        setTransfers(formattedTransfers);
-        setLoading(false);
-      }
-    } else if (convexTransfers && convexTransfers.length === 0) {
-      // Empty array - clear transfers
-      if (previousTransfersRef.current !== "empty") {
-        previousTransfersRef.current = "empty";
-        setTransfers([]);
-        setLoading(false);
-      }
+    // If Convex is not configured, load from contract
+    if (!isConvexConfigured()) {
+      const loadFromContract = async () => {
+        try {
+          setLoading(true);
+          const count = await loadTransferCount();
+          if (!count || count === 0) {
+            setTransfers([]);
+            setLoading(false);
+            return;
+          }
+          
+          // Load max 20 recent transfers in parallel
+          const maxLoad = 20;
+          const startId = Math.max(1, count - maxLoad + 1);
+          const transferPromises: Promise<Transfer | null>[] = [];
+          for (let id = startId; id <= count; id++) {
+            transferPromises.push(loadTransfer(id));
+          }
+          
+          const results = await Promise.all(transferPromises);
+          const userTransfers = results
+            .filter((t): t is Transfer => t !== null && (t.sender === address || t.recipient === address))
+            .sort((a, b) => b.createdAt - a.createdAt);
+          
+          setTransfers(userTransfers);
+          setLoading(false);
+        } catch (e) {
+          console.error("Failed to load transfers from contract:", e);
+          setTransfers([]);
+          setLoading(false);
+        }
+      };
+      void loadFromContract();
+      return;
     }
-  }, [address, convexTransfers]);
+
+    // Convex is configured - use Convex data directly
+    if (convexTransfers !== undefined) {
+      // Query has resolved - convert to Transfer format
+      const formattedTransfers: Transfer[] = convexTransfers.map((ct) => ({
+        id: ct.transferId,
+        sender: ct.sender,
+        recipient: ct.recipient,
+        amount: ct.amount,
+        fee: ct.fee,
+        createdAt: ct.createdAt,
+        completedAt: ct.completedAt ?? null,
+        cancelledAt: ct.cancelledAt ?? null,
+        status: ct.status,
+      }));
+      setTransfers(formattedTransfers);
+      setLoading(false);
+    }
+    // If convexTransfers is undefined, keep loading state (Convex is still fetching)
+  }, [address, convexTransfers, loadTransfer, loadTransferCount]);
 
   // Background sync: Only sync missing transfers if Convex is empty
   // This runs in the background and doesn't block the UI
